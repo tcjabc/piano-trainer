@@ -424,11 +424,11 @@ export class App {
       this.stage.replaceChildren(this.studyStage('free', this.free.el));
       this.hotkeys.set([
         { keys: [' ', 'Enter'], label: 'Space', hint: 'Start', action: 'start-pause', run: () => this.startFree() },
-        { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', run: () => this.setFreeHand('left') },
+        { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', optional: true, run: () => this.setFreeHand('left') },
         { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => this.setFreeHand('right') },
         { keys: ['3'], label: '3', hint: '', hidden: true, action: 'hand-both', run: () => this.setFreeHand('both') },
         { keys: ['Escape'], label: 'Esc', hint: 'Today', action: 'back', run: () => this.show('today') },
-        { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
+        { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
         ...this.commonHotkeys(),
       ]);
     } else if (screen === 'drill') {
@@ -484,7 +484,7 @@ export class App {
         hidden: !s.visualiser.enabled,
         run: () => void this.patchSettings({ visualiser: { ...this.settings.visualiser, overlay: !this.settings.visualiser.overlay } }),
       },
-      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
+      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
       ...this.commonHotkeys(),
     ]);
   }
@@ -530,7 +530,7 @@ export class App {
 
   private freeHandHotkeys(): Hotkey[] {
     return [
-      { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', run: () => this.setFreeHand('left') },
+      { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', optional: true, run: () => this.setFreeHand('left') },
       { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => this.setFreeHand('right') },
       { keys: ['3'], label: '3', hint: '', hidden: true, action: 'hand-both', run: () => this.setFreeHand('both') },
     ];
@@ -645,7 +645,7 @@ export class App {
         run: () => this.today.primaryAction(),
       },
       { keys: ['e'], label: 'E', hint: 'Free practice', run: () => this.show('free') },
-      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
+      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
       ...this.handHotkeys(),
       ...this.commonHotkeys(),
     ]);
@@ -654,7 +654,7 @@ export class App {
   /** Hand keys, for Study. */
   private handHotkeys(): Hotkey[] {
     return [
-      { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', run: () => void this.setHand('left') },
+      { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', optional: true, run: () => void this.setHand('left') },
       { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => void this.setHand('right') },
       { keys: ['3'], label: '3', hint: '', hidden: true, action: 'hand-both', run: () => void this.setHand('both') },
     ];
@@ -663,7 +663,7 @@ export class App {
   /** Zoom, area and fingering keys, on every screen. P and T are shown on the header tabs instead. */
   private commonHotkeys(): Hotkey[] {
     return [
-      { keys: ['-'], label: '- = 0', hint: 'Zoom', action: 'zoom-out', run: () => this.zoom.step(-1) },
+      { keys: ['-'], label: '- = 0', hint: 'Zoom', action: 'zoom-out', optional: true, run: () => this.zoom.step(-1) },
       { keys: ['=', '+'], label: '=', hint: '', hidden: true, action: 'zoom-in', run: () => this.zoom.step(1) },
       { keys: ['0'], label: '0', hint: '', hidden: true, run: () => this.zoom.fit() },
       { keys: ['p'], label: 'P', hint: '', hidden: true, action: 'area-play', run: () => this.showArea('play') },
@@ -687,12 +687,12 @@ export class App {
       { keys: ['ArrowDown'], label: '↑ ↓', hint: 'Select', action: 'next', run: () => this.library.move(1) },
       { keys: ['ArrowUp'], label: '↑', hint: '', hidden: true, action: 'previous', run: () => this.library.move(-1) },
       { keys: ['h'], label: 'H', hint: 'Hear', action: 'hear', run: () => this.library.hear(false) },
-      { keys: ['a'], label: 'A', hint: 'Arpeggio', run: () => this.library.hear(true) },
+      { keys: ['a'], label: 'A', hint: 'Arpeggio', optional: true, run: () => this.library.hear(true) },
       { keys: [' '], label: 'Space', hint: 'Practise', action: 'start-pause', run: () => this.practiseNow(this.library.current) },
       { keys: ['r'], label: 'R', hint: 'Review', run: () => void this.toggleReview(this.library.current) },
       { keys: ['Escape'], label: 'Esc', hint: '', hidden: true, action: 'back', run: () => this.library.clearSearch() },
       ...this.handHotkeys(),
-      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
+      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
       ...this.commonHotkeys(),
     ]);
   }

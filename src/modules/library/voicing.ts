@@ -78,7 +78,9 @@ export function notation(
     const clef = side === 'R' ? 'treble' : 'bass';
     const f = fingers[side] ?? null;
     if (item.kind === 'chord') {
-      out.push({ clef, spellings: notes.map((n) => n.spelling), fingers: f as NotationNote['fingers'] });
+      // Numbers stacked over a chord are too small to read at staff size, so
+      // chord fingering is shown on the keys only.
+      out.push({ clef, spellings: notes.map((n) => n.spelling) });
     } else {
       notes.forEach((n, i) => out.push({ clef, spellings: [n.spelling], fingers: f ? ([f[i] ?? null] as NotationNote['fingers']) : undefined }));
     }

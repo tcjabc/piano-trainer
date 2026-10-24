@@ -6,7 +6,7 @@
  */
 import { CHORD_QUALITIES, INVERSION_NAMES, chordNotes, type ChordQuality } from '../../core/chords';
 import { audio } from '../../core/audio';
-import { drawStaff } from '../../core/notation';
+import { drawStaff, GRAND_STAFF_HEIGHT, STAVE_MARGIN } from '../../core/notation';
 import { SCALE_TYPES, scaleInfo, scaleNotes, type ScaleType } from '../../core/scales';
 import type { HandChoice, LibrarySettings } from '../../core/settings';
 import { h, icon } from '../../ui/dom';
@@ -24,6 +24,11 @@ export interface LibraryActions {
 }
 
 const TICK_MS = 1600;
+const SEARCH_EXAMPLES = 'F#m7, Bb maj7 1st inv, C/E, D dorian, half diminished';
+/** Narrowest stave for a chord; scales get room for every note. */
+const MIN_STAVE_WIDTH = 200;
+const MAX_STAVE_WIDTH = 900;
+const STAVE_WIDTH_PER_NOTE = 38;
 
 export class LibraryView {
   readonly el: HTMLElement;
@@ -46,6 +51,9 @@ export class LibraryView {
   private listEl: HTMLElement;
   private detailEl: HTMLElement;
   private tickEl: HTMLElement;
+  /** The detail panel's staff; redrawn when its box changes shape. */
+  private drawing: HTMLElement | null = null;
+  private staveWidth = 0;
   private tickTimer = 0;
   private tracker: ScaleTracker | null = null;
   private showFingering = true;
@@ -60,7 +68,8 @@ export class LibraryView {
     this.hand = hand;
     this.search = h('input.control.library-search', {
       type: 'search',
-      placeholder: 'Search: F#m7, Bb maj7 1st inv, D dorian',
+      placeholder: 'Search, e.g. F#m7',
+      title: `Search by name, e.g. ${SEARCH_EXAMPLES}`,
       'aria-label': 'Search the library (/)',
       autocomplete: 'off',
       spellcheck: false,
@@ -87,6 +96,9 @@ export class LibraryView {
     });
     this.tickEl = h('p.play-along', { role: 'status', 'aria-live': 'polite' }, icon('check'), h('span', null, 'Played'));
     this.detailEl = h('section.panel.library-detail', { 'aria-label': 'Details' });
+    new ResizeObserver(() => {
+      if (this.drawing && Math.abs(this.fittedStaveWidth() - this.staveWidth) > 4) this.drawStaff();
+    }).observe(this.detailEl);
     this.el = h(
       'div.library',
       null,
@@ -285,6 +297,10 @@ export class LibraryView {
       );
       return;
     }
+    if (n === 0) {
+      this.listEl.replaceChildren(h('p.muted.library-empty', null, formatNoteName(`Nothing found. Try ${SEARCH_EXAMPLES}.`)));
+      return;
+    }
     this.listEl.replaceChildren(
       ...this.results.map((item) => {
         const badge = this.rowBadge(item);
@@ -302,47 +318,80 @@ export class LibraryView {
   private renderDetail(): void {
     const item = this.selected;
     if (!item) {
+      this.drawing = null;
       this.detailEl.replaceChildren(h('p.muted', null, 'Nothing matches these filters.'));
       if (this.active) this.keyboard.setHighlights([]);
       return;
     }
     const notes = item.kind === 'chord' ? chordNotes(item.spec.root, item.spec.quality) : scaleNotes(item.tonic, item.type);
-    const drawing = h('div.staff-drawing.library-drawing');
     const octaves = this.settings.octaves;
+    this.drawing = h('div.staff-drawing.library-drawing');
+    // Three rows: facts, the staff (takes the height that is left), actions.
     this.detailEl.replaceChildren(
-      ...present(
-      h('p.subheading', null, item.kind === 'chord' ? 'Chord' : `Scale · ${scaleInfo(item.type).group}`),
-      h('h1.heading.library-title', null, formatNoteName(item.kind === 'chord' ? item.symbol : item.name)),
-      item.kind === 'chord' ? h('p.library-name', null, formatNoteName(item.name)) : null,
       h(
-        'dl.library-facts',
+        'div.library-info',
         null,
-        h('dt', null, 'Formula'),
-        h('dd', null, formatDegrees(item.formula)),
-        h('dt', null, 'Notes'),
-        h('dd', null, formatNoteName(notes.join('  '))),
+        ...present(
+          h('p.subheading', null, item.kind === 'chord' ? 'Chord' : `Scale · ${scaleInfo(item.type).group}`),
+          h('h1.heading.library-title', null, formatNoteName(item.kind === 'chord' ? item.symbol : item.name)),
+          item.kind === 'chord' ? h('p.library-name', null, formatNoteName(item.name)) : null,
+          h(
+            'dl.library-facts',
+            null,
+            h('dt', null, 'Formula'),
+            h('dd', null, formatDegrees(item.formula)),
+            h('dt', null, 'Notes'),
+            h('dd', null, formatNoteName(notes.join('  '))),
+          ),
+        ),
       ),
-      drawing,
+      this.drawing,
       h(
-        'div.button-row',
+        'div.library-actions',
         null,
-        h('button.button-outline', { type: 'button', onclick: () => this.hear(false) }, icon('volume-2'), h('span', null, item.kind === 'chord' ? 'Hear' : 'Hear up and down'), h('kbd', null, 'H')),
-        item.kind === 'chord'
-          ? h('button.button-outline', { type: 'button', onclick: () => this.hear(true) }, h('span', null, 'Arpeggio'), h('kbd', null, 'A'))
-          : null,
-      ),
-      ...this.detailExtras(item),
-      this.tickEl,
+        ...present(
+          h(
+            'div.button-row',
+            null,
+            h('button.button-outline', { type: 'button', onclick: () => this.hear(false) }, icon('volume-2'), h('span', null, item.kind === 'chord' ? 'Hear' : 'Hear up and down'), h('kbd', null, 'H')),
+            item.kind === 'chord'
+              ? h('button.button-outline', { type: 'button', onclick: () => this.hear(true) }, h('span', null, 'Arpeggio'), h('kbd', null, 'A'))
+              : null,
+          ),
+          ...this.detailExtras(item),
+          this.tickEl,
+        ),
       ),
     );
-    const count = item.kind === 'chord' ? 1 : notation(item, this.hand, octaves).length / (this.hand === 'both' ? 2 : 1);
-    drawStaff(drawing, 'grand', notation(item, this.hand, octaves, this.fingersFor(item)), {
-      staveWidth: Math.max(260, 70 + count * 38),
-    });
+    this.drawStaff();
     if (this.active) {
       this.keyboard.setHighlights(itemKeys(item, this.hand, octaves));
       this.showFingersOnKeys(item);
     }
+  }
+
+  /** Draw the selected item's staff, shaped to fill the box it has. */
+  private drawStaff(): void {
+    const item = this.selected;
+    if (!item || !this.drawing) return;
+    this.staveWidth = this.fittedStaveWidth();
+    drawStaff(this.drawing, 'grand', notation(item, this.hand, this.settings.octaves, this.fingersFor(item)), {
+      staveWidth: this.staveWidth,
+    });
+  }
+
+  /**
+   * As wide as the box's proportions allow (so the staff fills its height),
+   * but never narrower than the notes need; the drawing then scales down.
+   */
+  private fittedStaveWidth(): number {
+    const item = this.selected;
+    if (!item || !this.drawing) return 0;
+    const count = item.kind === 'chord' ? 1 : notation(item, 'right', this.settings.octaves).length;
+    const needed = Math.max(MIN_STAVE_WIDTH, 70 + count * STAVE_WIDTH_PER_NOTE);
+    const { clientWidth: w, clientHeight: hgt } = this.drawing;
+    const fitted = w > 0 && hgt > 0 ? (w / hgt) * GRAND_STAFF_HEIGHT - STAVE_MARGIN : needed;
+    return Math.round(Math.min(MAX_STAVE_WIDTH, Math.max(needed, fitted)));
   }
 
   /** Finger numbers for the staff, when fingering is shown. */

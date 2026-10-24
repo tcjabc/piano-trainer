@@ -31,6 +31,7 @@ export interface NotationNote {
 class ColouredFinger extends FretHandFinger {
   constructor(private readonly finger: Finger) {
     super(String(finger));
+    this.setFontSize(`${FINGER_FONT_SIZE}px`);
   }
 
   override draw(): void {
@@ -52,8 +53,13 @@ const GRAND_HEIGHT = 240;
 export const GRAND_STAFF_HEIGHT = GRAND_HEIGHT;
 /** Space left of the stave in the drawing (margin and brace). */
 export const STAVE_MARGIN = 20;
+/** Finger numbers on the staff, in drawing units (VexFlow's 9pt default is too small to read). */
+const FINGER_FONT_SIZE = 17;
 /** Vertical distance between stacked finger numbers. */
-const FINGER_STACK_STEP = 12;
+const FINGER_STACK_STEP = FINGER_FONT_SIZE;
+/** Larger numbers need more room to clear the notehead (VexFlow spaces them for 9pt). */
+const FINGER_ABOVE_SHIFT = -4;
+const FINGER_BELOW_SHIFT = 8;
 
 let fontsReady: Promise<unknown> | null = null;
 
@@ -96,7 +102,7 @@ function addFingering(staveNote: StaveNote, clef: Clef, fingers: (Finger | null)
     staveNote.addModifier(
       new ColouredFinger(finger)
         .setPosition(above ? Modifier.Position.ABOVE : Modifier.Position.BELOW)
-        .setYShift(step * FINGER_STACK_STEP),
+        .setYShift(step * FINGER_STACK_STEP + (above ? FINGER_ABOVE_SHIFT : FINGER_BELOW_SHIFT)),
       anchor,
     );
   });

@@ -507,10 +507,11 @@ select.control {
   padding: 0 var(--spacing-10);
 }
 
+/* Hints use the space left of the zoom control and are centred in it. */
 .hint-bar {
-  grid-column: 2;
+  grid-column: 1 / 3;
   display: flex;
-  justify-content: center;
+  justify-content: safe center;
   gap: var(--spacing-20);
   overflow: hidden;
   white-space: nowrap;
@@ -995,8 +996,11 @@ select.control {
   font-size: var(--text-caption);
 }
 
-/* Not enough room: drop the mapped controls, keep the keys. */
-.hint-bar.is-compact .hint-control {
+/* Not enough room: drop the mapped controls, then optional hints, then the
+   descriptions (the keys stay, with the description as a tooltip). */
+.hint-bar.is-compact .hint-control,
+.hint-bar.is-keys-only .hint-text,
+.hint.is-dropped {
   display: none;
 }
 
@@ -1029,12 +1033,14 @@ select.control {
  * ♯ ♭ ♮ 𝄪 𝄫 from the SMuFL music font (Chillax has none). SMuFL glyphs are
  * centred on their baseline, so they are raised to sit mid-way up the capitals;
  * line-height 0 keeps the music font's tall metrics out of the line box.
+ * The weight is inherited: Bravura has one weight, so the browser emboldens
+ * it to match semibold and bold text.
  */
 .acc {
   font-family: 'Bravura', serif;
   font-size: var(--acc-size);
   font-style: normal;
-  font-weight: normal;
+  font-synthesis: weight;
   letter-spacing: 0;
   line-height: 0;
   vertical-align: var(--acc-raise);
@@ -1228,13 +1234,22 @@ select.control {
   color: var(--color-text-muted);
 }
 
+/* Facts, then the staff in the height that is left, then the actions. The
+   staff never gets shorter than its minimum; below that the panel scrolls. */
 .library-detail {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto minmax(var(--library-staff-min-height), 1fr) auto;
   gap: var(--spacing-10);
   max-width: none;
   min-height: 0;
   overflow: auto;
+}
+
+.library-info,
+.library-actions {
+  display: grid;
+  align-content: start;
+  gap: var(--spacing-10);
 }
 
 .library-title {
@@ -1267,10 +1282,14 @@ select.control {
 
 .library-drawing {
   max-width: none;
+  height: 100%;
+  min-height: 0;
 }
 
 .library-drawing svg {
-  max-height: var(--library-staff-height);
+  width: 100%;
+  height: 100%;
+  max-height: none;
 }
 
 /* Playing the item along: a quiet tick, no score. */

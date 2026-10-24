@@ -183,16 +183,17 @@
   --icon-size-sm: 14px;
   --control-height: 36px;
   --finger-badge-size: 20px;
-  /* Accidental glyphs in text (Bravura, measured against Chillax capitals):
-     at 0.9em a sharp is about cap height; raised so ♯ ♮ 𝄪 centre on the
-     capitals and ♭ 𝄫 rest just on the baseline. */
-  --acc-size: 0.9em;
-  --acc-raise: 0.38em;
-  --acc-raise-flat: 0.22em;
-  --acc-gap: 0.03em;
+  /* Accidental glyphs in text, in em of the glyph so they scale with every
+     text size (Bravura measured against Chillax, cap height 0.68em). At 1.2em
+     a sharp is 0.84em tall, a little taller than the capitals as in print;
+     raised so ♯ ♮ 𝄪 centre on the capitals and ♭ 𝄫 sit on the baseline. */
+  --acc-size: 1.2em;
+  --acc-raise: 0.28em;
+  --acc-raise-flat: 0.18em;
+  --acc-gap: 0.04em;
   --play-card-max-width: 960px;
   --library-sidebar-width: 260px;
-  --library-staff-height: 260px;
+  --library-staff-min-height: 180px;
   --play-overlay-width: 320px;
   --play-overlay-staff-height: 150px;
   --hand-size: clamp(80px, calc(var(--keyboard-height) - var(--spacing-30)), 104px);

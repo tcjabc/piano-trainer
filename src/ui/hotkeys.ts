@@ -16,6 +16,8 @@ export interface Hotkey {
   run: () => void;
   /** Works but is not listed (it shares another entry's hint). */
   hidden?: boolean;
+  /** Listed only when there is room (dropped first, last one first). */
+  optional?: boolean;
   /** The app action this performs, for mapped MIDI controls. */
   action?: ActionId;
 }
@@ -35,6 +37,7 @@ export class Hotkeys {
     this.el = h('footer.hint-bar', { 'aria-label': 'Keyboard shortcuts' });
     window.addEventListener('keydown', (e) => this.handle(e));
     new ResizeObserver(() => this.fit()).observe(this.el);
+    void document.fonts.ready.then(() => this.fit());
   }
 
   /** Replace the active set of shortcuts (one set per screen). */
@@ -43,29 +46,51 @@ export class Hotkeys {
     this.render();
   }
 
+  private hints: { el: HTMLElement; optional: boolean }[] = [];
+
   /** Redraw the hints (e.g. after a control is learned). */
   render(): void {
-    this.el.replaceChildren(
-      ...this.active
-        .filter((k) => !k.hidden)
-        .map((k) => {
-          const control = k.action ? this.controlLabel(k.action) : null;
-          return h(
-            'span.hint',
-            null,
-            ...k.label.split(' ').map((key) => h('kbd', null, key)),
-            control ? h('span.hint-control', { title: `Mapped control: ${control}` }, formatNoteName(control)) : null,
-            h('span', null, k.hint),
-          );
-        }),
-    );
+    this.hints = this.active
+      .filter((k) => !k.hidden)
+      .map((k) => {
+        const control = k.action ? this.controlLabel(k.action) : null;
+        const el = h(
+          'span.hint',
+          { title: `${k.label} — ${k.hint}` },
+          ...k.label.split(' ').map((key) => h('kbd', null, key)),
+          control ? h('span.hint-control', { title: `Mapped control: ${control}` }, formatNoteName(control)) : null,
+          h('span.hint-text', null, k.hint),
+        );
+        return { el, optional: !!k.optional };
+      });
+    this.el.replaceChildren(...this.hints.map((x) => x.el));
     this.fit();
   }
 
-  /** Mapped controls are shown only where space allows. */
+  /**
+   * Never clip: when the hints don't fit, drop the mapped controls, then the
+   * optional hints (last first), then the descriptions (keys only), then
+   * hints from the end until the rest fit.
+   */
   private fit(): void {
-    this.el.classList.remove('is-compact');
-    if (this.el.scrollWidth > this.el.clientWidth) this.el.classList.add('is-compact');
+    const el = this.el;
+    el.classList.remove('is-compact', 'is-keys-only');
+    for (const x of this.hints) x.el.classList.remove('is-dropped');
+    const fits = () => el.scrollWidth <= el.clientWidth;
+    if (el.clientWidth === 0 || fits()) return;
+    el.classList.add('is-compact');
+    if (fits()) return;
+    const drop = (list: typeof this.hints) => {
+      for (const x of [...list].reverse()) {
+        x.el.classList.add('is-dropped');
+        if (fits()) return true;
+      }
+      return false;
+    };
+    if (drop(this.hints.filter((x) => x.optional))) return;
+    el.classList.add('is-keys-only');
+    if (fits()) return;
+    drop(this.hints.filter((x) => !x.optional).slice(1));
   }
 
   /** Run the current screen's shortcut for an action (from a mapped MIDI control). */

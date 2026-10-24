@@ -116,7 +116,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Contents:** 15 chord qualities with every inversion (major, minor, diminished, augmented, sus2, sus4, 6, m6, 7, maj7, m7, m7♭5, dim7, add9, 9) and 15 scale types (major, natural/harmonic/melodic minor, the seven modes, major and minor pentatonic, blues, chromatic). That's 947 items, generated with tonal.
 - **Spelling:** roots use key spelling, with both spellings offered where both are common (C♯/D♭ and F♯/G♭ major, D♯/E♭ minor). Chromatic scales are spelled with sharps (flats from flat tonics). The blues ♭5 is written ♯4 where it would need a double flat.
 - **Filters:** type, chord quality, inversion, scale type, root, hand and scale octaves. Search works within the filters; if they hide everything, the list offers to clear them.
-- **Detail panel:** the name, the formula as degrees (1–♭3–5), the notes, a grand staff, and the item's keys marked on the keyboard, with fingering in the finger colours on the keys and above (right hand) or below (left hand) the notes.
+- **Detail panel:** the name, the formula as degrees (1–♭3–5), the notes, a grand staff sized to the panel, and the item's keys marked on the keyboard. Fingering is shown in the finger colours on the keys; scales also show it above (right hand) or below (left hand) each note. Chord fingering stays on the keys, since numbers stacked over a chord are too small to read.
 - **Review:** whether the item is in review for the current hand, and when it's next due. "Remove from review" keeps the card's history, so adding it again picks up where it left off.
 - **Play along:** play the item on your keyboard and a quiet tick appears. Nothing is scored.
 - **Decks** (in the sidebar) are saved filters.
@@ -143,7 +143,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Mapped controls only run actions:** they never also play a note or count as a drill answer.
 - **Actions:** Play area, Study area, Library, Start/pause, Restart card, Skip/next, Previous, Hear answer, Toggle visualiser, Toggle fingering, Left/Right/Both hands, Zoom in/out, Settings and Back. A mapped control does what the matching key does on the current screen; where that key does nothing, so does the control.
 - **Knobs:** *Keyboard zoom (knob)* takes a knob. Its encoding (absolute, or one of three relative styles) is guessed from the first few values while you turn it. You can change it in the row if the guess is wrong. Tempo will be added here later.
-- **Saving:** mappings are stored in settings and included in the JSON export. When there's room, the hint bar shows the mapped control next to each key.
+- **Saving:** mappings are stored in settings and included in the JSON export. When there's room, the hint bar shows the mapped control next to each key. The hint bar never clips: when space is short it drops the mapped controls, then the less important hints, then the descriptions (keys only, with the description as a tooltip).
 
 ## Offline and updates
 
