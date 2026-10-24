@@ -102,6 +102,8 @@ export interface SongSettings {
   progressiveTempo: boolean;
   /** A bar of metronome count-in before play-along and loops. */
   countIn: boolean;
+  /** Suggest fingering for notes without any when a song is imported. */
+  autoFingering: boolean;
   /** The bundled public-domain songs have been added (once; they can be deleted). */
   bundledAdded: boolean;
 }
@@ -194,6 +196,7 @@ export const DEFAULT_SETTINGS: Settings = {
     tempo: 1,
     progressiveTempo: false,
     countIn: true,
+    autoFingering: true,
     bundledAdded: false,
   },
 };

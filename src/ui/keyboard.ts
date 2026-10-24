@@ -220,8 +220,8 @@ export class Keyboard extends Emitter<KeyboardEvents> {
     key.querySelector('.finger-badge')?.remove();
     if (!fingering) return;
     const badge = h(
-      'span.finger-badge',
-      { title: fingeringLabel(fingering), dataset: { hand: fingering.hand } },
+      fingering.suggested ? 'span.finger-badge.is-suggested' : 'span.finger-badge',
+      { title: `${fingeringLabel(fingering)}${fingering.suggested ? ' (suggested)' : ''}`, dataset: { hand: fingering.hand } },
       String(fingering.finger),
       h('span.finger-hand', null, fingering.hand),
     );

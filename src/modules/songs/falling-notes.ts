@@ -24,6 +24,8 @@ export interface FallingStyle {
 const VISIBLE_BEATS = 8;
 /** How much of a hand-coloured note's core keeps its colour (the visualiser's is mostly white). */
 const HAND_CORE_TINT = 0.75;
+/** How bright a note with a suggested finger is, next to one fingered in the score or by you. */
+const SUGGESTED_ALPHA = 0.6;
 /** How long a judgement label stays under the note (ms). */
 const LABEL_MS = 700;
 
@@ -160,6 +162,7 @@ export class FallingNotes {
       const mark = player.marks.get(n.id);
       let alpha = active.includes(n.hand) ? 1 : other === 'play' ? 0.55 : 0.3;
       if (mark?.kind === 'missed') alpha *= 0.35;
+      if (n.suggested && style.colors === 'finger') alpha *= SUGGESTED_ALPHA;
       ctx.globalAlpha = alpha;
       drawPill(ctx, this.tokens, this.spritesFor(this.colorFor(n, style), this.byHand(n, style)), x, Math.min(top, bottom - w), bottom, w);
       this.hits.push({ note: n, x, top: Math.min(top, bottom - w), bottom, w });
@@ -179,6 +182,8 @@ export class FallingNotes {
       ctx.fillStyle = '#111';
       let y = hit.bottom - 3 * dpr;
       if (n.finger) {
+        // A suggested finger: in italics, so it reads as a suggestion.
+        if (n.suggested) ctx.font = `italic 600 ${size}px Chillax, sans-serif`;
         ctx.fillText(String(n.finger), hit.x, y);
         y -= size + 2 * dpr;
       }

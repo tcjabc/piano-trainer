@@ -15,7 +15,8 @@ import type { HandChoice, SongSettings, VisualiserColors } from '../../core/sett
 import { notesIn, sectionBeats, songEndBeat, measureAt, type Section, type SongNote } from '../../core/song';
 import { applyPass, describeStep, LEARNED, requirement, type SongMode } from '../../core/song-learning';
 import { mergeWithNext, splitSection } from '../../core/song-sections';
-import { setXmlFingering } from '../../core/song-musicxml';
+import { setXmlFingering, withXmlFingeringText } from '../../core/song-musicxml';
+import { withoutSuggestedFingering, withSuggestedFingering } from '../../core/autofinger';
 import { h, icon } from '../../ui/dom';
 import { FormBuilder } from '../../ui/form';
 import type { Keyboard } from '../../ui/keyboard';
@@ -397,13 +398,40 @@ export class PlayerView {
   private async setFinger(note: SongNote, finger: Finger | null): Promise<void> {
     const entry = this.entry!;
     this.fingerMenu.hidden = true;
-    const notes = entry.song.data.notes.map((n) => (n.id === note.id ? { ...n, finger } : n));
+    // A finger you set is yours, even where one was suggested.
+    const notes = entry.song.data.notes.map((n) => {
+      if (n.id !== note.id) return n;
+      const { suggested: _, ...own } = n;
+      return { ...own, finger };
+    });
     const musicXml = entry.song.musicXml && note.xmlIndex !== undefined ? setXmlFingering(entry.song.musicXml, note.xmlIndex, finger) : entry.song.musicXml;
     entry.song = await saveSong({ ...entry.song, data: { ...entry.song.data, notes }, musicXml });
     this.player?.setData(entry.song.data);
     this.renderFingeringNote();
     this.resultEl.textContent = finger ? `Finger ${finger} saved.` : 'Finger cleared.';
-    if (this.settings.view === 'notation' && musicXml) void this.notation.show(musicXml);
+    this.renderView();
+  }
+
+  /** Fill in suggested fingering where notes have none, or take every suggestion off. */
+  private async suggestFingering(on: boolean): Promise<void> {
+    const entry = this.entry!;
+    const before = entry.song.data.notes.filter((n) => n.suggested).length;
+    const notes = on ? withSuggestedFingering(entry.song.data.notes) : withoutSuggestedFingering(entry.song.data.notes);
+    entry.song = await saveSong({ ...entry.song, data: { ...entry.song.data, notes } });
+    this.player?.setData(entry.song.data);
+    const after = notes.filter((n) => n.suggested).length;
+    this.resultEl.textContent = on ? `Suggested fingers for ${after - before} notes.` : `Cleared ${before} suggested fingers.`;
+    this.keysShown = '';
+    this.renderAll();
+  }
+
+  /** The score as shown: suggested fingers added in brackets, like editorial fingering. */
+  private displayXml(): string | null {
+    const song = this.entry?.song;
+    if (!song?.musicXml) return null;
+    const texts = new Map<number, string>();
+    for (const n of song.data.notes) if (n.suggested && n.finger && n.xmlIndex !== undefined) texts.set(n.xmlIndex, `(${n.finger})`);
+    return withXmlFingeringText(song.musicXml, texts);
   }
 
   // ── Section edits ────────────────────────────────────────────────────
@@ -453,12 +481,12 @@ export class PlayerView {
       const next = data.notes.find((n) => hands.includes(n.hand) && n.beat >= player.position - 0.01 && n.beat < player.currentRange[1]);
       upcoming = next ? data.notes.filter((n) => hands.includes(n.hand) && Math.abs(n.beat - next.beat) < 1e-3) : [];
     }
-    const sig = upcoming.map((n) => `${n.midi}:${n.finger ?? ''}:${n.hand}`).join(',');
+    const sig = upcoming.map((n) => `${n.midi}:${n.finger ?? ''}:${n.hand}:${n.suggested ? 's' : ''}`).join(',');
     if (sig !== this.keysShown) {
       this.keysShown = sig;
       this.keyboard.setHighlights(upcoming.map((n) => n.midi));
       this.keyboard.clearFingers();
-      for (const n of upcoming) if (n.finger) this.keyboard.setFinger(n.midi, { finger: n.finger, hand: n.hand });
+      for (const n of upcoming) if (n.finger) this.keyboard.setFinger(n.midi, { finger: n.finger, hand: n.hand, suggested: n.suggested });
     }
     const lit = new Set(this.playing ? player.appSounding().map((n) => n.midi) : []);
     for (const n of this.litShown) if (!lit.has(n)) this.keyboard.setLit(n, null);
@@ -497,7 +525,7 @@ export class PlayerView {
     const notation = this.settings.view === 'notation' && !!this.entry?.song.musicXml;
     this.viewEl.replaceChildren(notation ? this.notation.el : this.falling.el, this.fingerMenu);
     this.viewEl.classList.toggle('is-notation', notation);
-    if (notation) void this.notation.show(this.entry!.song.musicXml!);
+    if (notation) void this.notation.show(this.displayXml()!);
   }
 
   private renderHead(): void {
@@ -531,7 +559,15 @@ export class PlayerView {
         ], this.settings.otherHand, (otherHand) => this.setSetting({ otherHand }))),
         f.checkbox(this.settings.noteNames, (noteNames) => this.setSetting({ noteNames }), 'Note names on falling notes'),
         f.checkbox(this.settings.countIn, (countIn) => this.setSetting({ countIn }), 'Count in a bar before play-along'),
-        h('p.muted.song-options-note', null, 'Click a falling note while stopped to set its finger.'),
+        h(
+          'div.song-options-row',
+          null,
+          h('button.button-outline', { type: 'button', title: 'Fill in fingering where notes have none', onclick: () => void this.suggestFingering(true) }, 'Suggest fingering'),
+          song.data.notes.some((n) => n.suggested)
+            ? h('button.button-outline', { type: 'button', onclick: () => void this.suggestFingering(false) }, 'Clear suggested fingering')
+            : null,
+        ),
+        h('p.muted.song-options-note', null, 'Suggested fingers are fainter, dotted on the keys and in brackets in the score. Click a falling note while stopped to set its finger.'),
       ),
     );
     this.head.replaceChildren(

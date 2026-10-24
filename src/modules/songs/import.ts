@@ -2,6 +2,8 @@
  * Turning files into songs: .mid/.midi (which may need a split point for the
  * hands), .musicxml/.xml and .mxl. Also the bundled public-domain songs.
  */
+import { withSuggestedFingering } from '../../core/autofinger';
+import type { SongData } from '../../core/song';
 import { autoSections } from '../../core/song-sections';
 import { midiToSong, MIDDLE_C, needsSplit, readMidi, type ParsedMidi } from '../../core/song-midi';
 import { parseMusicXml, unzipMxl } from '../../core/song-musicxml';
@@ -26,7 +28,16 @@ export type PendingImport =
 
 const baseName = (fileName: string) => fileName.replace(/\.[^.]+$/, '');
 
-export function musicXmlRecord(xml: string, fileName: string, bundled: string | null = null, now = Date.now()): SongRecord {
+export interface ImportOptions {
+  /** Suggest fingering for notes that have none (fingering from the file is never changed). */
+  autoFinger?: boolean;
+}
+
+function fingered(data: SongData, { autoFinger = false }: ImportOptions): SongData {
+  return autoFinger ? { ...data, notes: withSuggestedFingering(data.notes) } : data;
+}
+
+export function musicXmlRecord(xml: string, fileName: string, bundled: string | null = null, now = Date.now(), options: ImportOptions = {}): SongRecord {
   const parsed = parseMusicXml(xml);
   return {
     id: uuid(),
@@ -35,7 +46,7 @@ export function musicXmlRecord(xml: string, fileName: string, bundled: string | 
     format: 'musicxml',
     fileName,
     musicXml: xml,
-    data: parsed.data,
+    data: fingered(parsed.data, options),
     sections: autoSections(parsed.data.measures),
     bundled,
     createdAt: now,
@@ -43,8 +54,8 @@ export function musicXmlRecord(xml: string, fileName: string, bundled: string | 
   };
 }
 
-export function midiRecord(parsed: ParsedMidi, fileName: string, split = MIDDLE_C, now = Date.now()): SongRecord {
-  const data = midiToSong(parsed, split);
+export function midiRecord(parsed: ParsedMidi, fileName: string, split = MIDDLE_C, now = Date.now(), options: ImportOptions = {}): SongRecord {
+  const data = fingered(midiToSong(parsed, split), options);
   return {
     id: uuid(),
     title: parsed.title || baseName(fileName),
@@ -61,7 +72,7 @@ export function midiRecord(parsed: ParsedMidi, fileName: string, split = MIDDLE_
 }
 
 /** Read a dropped or picked file. Throws with a readable message when it can't be used. */
-export async function readSongFile(file: File): Promise<PendingImport> {
+export async function readSongFile(file: File, options: ImportOptions = {}): Promise<PendingImport> {
   const name = file.name;
   const ext = name.toLowerCase().split('.').pop() ?? '';
   if (ext === 'mid' || ext === 'midi') {
@@ -69,8 +80,8 @@ export async function readSongFile(file: File): Promise<PendingImport> {
     if (parsed.tracks.length === 0) throw new Error(`“${name}” has no notes.`);
     return { kind: 'midi', parsed, fileName: name, needsSplit: needsSplit(parsed) };
   }
-  if (ext === 'mxl') return { kind: 'ready', record: checked(musicXmlRecord(unzipMxl(new Uint8Array(await file.arrayBuffer())), name), name) };
-  if (ext === 'musicxml' || ext === 'xml') return { kind: 'ready', record: checked(musicXmlRecord(await file.text(), name), name) };
+  if (ext === 'mxl') return { kind: 'ready', record: checked(musicXmlRecord(unzipMxl(new Uint8Array(await file.arrayBuffer())), name, null, Date.now(), options), name) };
+  if (ext === 'musicxml' || ext === 'xml') return { kind: 'ready', record: checked(musicXmlRecord(await file.text(), name, null, Date.now(), options), name) };
   throw new Error(`“${name}” isn't a MIDI or MusicXML file.`);
 }
 

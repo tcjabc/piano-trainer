@@ -9,6 +9,8 @@ export type Hand = 'L' | 'R';
 export interface Fingering {
   finger: Finger;
   hand: Hand;
+  /** Suggested by automatic fingering (shown fainter, with a dotted outline). */
+  suggested?: boolean;
 }
 
 export const FINGERS: readonly Finger[] = [1, 2, 3, 4, 5];

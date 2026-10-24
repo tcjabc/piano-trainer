@@ -26,7 +26,7 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | `npm run dev` | Vite dev server with hot reload |
 | `npm run build` | Typecheck, then build the production app into `dist/` (with service worker) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | Unit tests (Vitest): song import (MIDI, MusicXML), hand splitting, sections, wait-mode matching, timing judgement, learning path, theory notes and templating, metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
+| `npm test` | Unit tests (Vitest): automatic fingering, song import (MIDI, MusicXML, a MuseScore .mxl), hand splitting, sections, wait-mode matching, timing judgement, learning path, theory notes and templating, metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
 | `npm run typecheck` | TypeScript only |
 
 ## Using it
@@ -182,7 +182,23 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
   - **H** plays the section first (listen mode at the card's tempo), then it's your turn. Like hearing the answer on other cards, this caps the grade at Hard.
   - Grades: under 80% right is Again; a pass that isn't clean is Hard; a clean pass is Good, or Easy when perfect (wait mode) or 95%+ on time (play-along).
 
-**Fingering:** taken from the MusicXML where present. Click a falling note while stopped to set or clear its finger (1–5). It's saved with the song and written into its score, so the notation shows it too. Nothing is generated automatically.
+**Fingering:** taken from the MusicXML where present (from `<notations><technical><fingering>`, as MuseScore, Finale, Sibelius and Dorico write it). Click a falling note while stopped to set or clear its finger (1–5). It's saved with the song and written into its score, so the notation shows it too.
+
+- **Without fingering**, notes are coloured by hand in neutral greys (cool slate left, warm cream right) that can't be mistaken for a finger colour, and the player says so.
+- **Automatic fingering** (`src/core/autofinger.ts`): when a song is imported, notes without a finger get a suggested one. This is on by default; turn it off with the checkbox in the Songs tab.
+  - The player's Options can **Suggest fingering** for an existing song, or **Clear suggested fingering**.
+  - Fingering from the file, and fingers you set, are never changed. Setting a suggested finger makes it yours.
+  - Suggestions are shown fainter with an italic number on falling notes, dotted on the keys, and in brackets, like editorial fingering, in the score. The stored score isn't changed.
+  - The scale and chord tables in `src/core/fingerings.ts` stay the source for Library drills.
+- **How it works:** for each hand, dynamic programming (Viterbi) over the fingers each step could take, minimising an ergonomic cost model in the style of Parncutt et al. (1997), written from scratch.
+  - It uses practical, comfortable and relaxed spans for each finger pair, and penalties for weak fingers (half Parncutt's weight), the thumb or little finger on black keys, 3 followed by 4, the same finger on another note, and hand-position changes.
+  - Passing the thumb is cheapest from a finger on a black key to the thumb on a white one.
+  - Chord fingers go in pitch order, about one finger per scale step apart, and nothing beyond a practical span is chosen.
+  - The left hand mirrors the right.
+- **How well it does:**
+  - It reproduces the standard one-octave fingering of C, G, F, D and E♭ major in both hands, and B♭ major apart from its first note in the right hand.
+  - On the bundled songs with their fingering removed, it agrees with the written fingering for 87% of notes: Twinkle 62% (right) and 89% (left), Ode to Joy 98% and 74%, Minuet in G 94% and 100%.
+  - A song of thousands of notes takes milliseconds.
 
 | Key | Action |
 | --- | --- |
@@ -296,6 +312,7 @@ src/
     song-sections.ts automatic sections, split and merge
     song-judge.ts  wait-mode step matching, play-along timing judgement
     song-learning.ts learning path and progressive tempo
+    autofinger.ts  automatic fingering for songs (Viterbi over an ergonomic cost model)
   data/theory.ts theory notes for each chord quality and scale type (hand-editable)
   data/songs/    the bundled public-domain songs (MusicXML)
   modules/notes/ note cards, today's plan, free practice selection

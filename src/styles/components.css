@@ -2166,3 +2166,26 @@ select.control {
 .song-fingering-note:empty {
   display: none;
 }
+
+/* A suggested finger (automatic fingering): fainter, with a dotted outline. */
+.finger-badge.is-suggested {
+  opacity: var(--suggested-opacity);
+  outline: var(--border-hairline) dotted var(--finger-color);
+  outline-offset: 1px;
+  font-style: italic;
+}
+
+.song-options-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-5);
+}
+
+.song-options-row .button-outline {
+  height: auto;
+  padding: var(--spacing-2) var(--spacing-8);
+}
+
+.songs-auto-finger {
+  font-size: var(--text-caption);
+}

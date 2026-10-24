@@ -240,6 +240,30 @@ function dedupeTempos(tempos: TempoChange[]): TempoChange[] {
   return out;
 }
 
+/**
+ * A copy of the score with extra fingering text on some notes (by their
+ * place among the <note> elements), for display only: e.g. suggested
+ * fingers as "(3)". Notes that already have fingering are left alone.
+ */
+export function withXmlFingeringText(xml: string, texts: ReadonlyMap<number, string>): string {
+  if (texts.size === 0) return xml;
+  const doc = parseXml(xml);
+  const ns = doc.documentElement.namespaceURI;
+  const notes = doc.getElementsByTagName('note');
+  for (const [index, value] of texts) {
+    const note = notes[index];
+    if (!note || note.getElementsByTagName('fingering').length) continue;
+    let notations = child(note, 'notations');
+    if (!notations) notations = note.appendChild(doc.createElementNS(ns, 'notations'));
+    let technical = child(notations, 'technical');
+    if (!technical) technical = notations.appendChild(doc.createElementNS(ns, 'technical'));
+    const fingering = doc.createElementNS(ns, 'fingering');
+    fingering.textContent = value;
+    technical.appendChild(fingering);
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+
 /** Write (or remove, with null) the fingering of the score's nth <note>; returns the new XML. */
 export function setXmlFingering(xml: string, index: number, finger: Finger | null): string {
   const doc = parseXml(xml);

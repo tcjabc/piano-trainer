@@ -114,7 +114,11 @@ export class App {
   private studyNav = new StudyNav((view) => this.show(view));
   private library: LibraryView;
   private libraryNav = new LibraryNav((tab) => this.showLibraryTab(tab));
-  private songs = new SongsView({ open: (id) => void this.openSong(id) });
+  private songs = new SongsView({
+    open: (id) => void this.openSong(id),
+    autoFingering: () => this.settings.songs.autoFingering,
+    setAutoFingering: (autoFingering) => this.rememberSongSettings({ ...this.settings.songs, autoFingering }),
+  });
   private player: PlayerView;
   /** Plays song sections that come up in a Study session. */
   private reviewPlayer: PlayerView;
@@ -161,7 +165,9 @@ export class App {
     this.library.setSidebarExtras(this.decksPanel.el);
     this.player = new PlayerView(this.keyboard, {
       back: () => this.showLibraryTab('songs'),
-      settingsChanged: (songs) => this.rememberSongSettings(songs),
+      // Only the player's own settings; the rest (auto-fingering, daily limits) may have changed elsewhere.
+      settingsChanged: ({ view, colors, noteNames, otherHand, mode, tempo, progressiveTempo, countIn }) =>
+        this.rememberSongSettings({ ...this.settings.songs, view, colors, noteNames, otherHand, mode, tempo, progressiveTempo, countIn }),
       handShown: (hand) => this.hands.set(hand),
       reviewState: (songId, sectionId) => this.songReviewState(songId, sectionId),
       toggleReview: (songId, sectionId) => this.toggleSongReview(songId, sectionId),

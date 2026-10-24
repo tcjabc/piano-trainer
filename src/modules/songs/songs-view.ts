@@ -16,6 +16,9 @@ import { loadSongs, progressOf, saveSong, type SongEntry } from './song-store';
 
 export interface SongsActions {
   open: (songId: string) => void;
+  /** Whether imports get suggested fingering, and changing that setting. */
+  autoFingering: () => boolean;
+  setAutoFingering: (on: boolean) => void;
 }
 
 /** Lowest and highest split points offered (C2…C6). */
@@ -36,6 +39,7 @@ export class SongsView {
   /** Song being renamed, or deleted (asking to confirm). */
   private editing: { id: string; kind: 'rename' | 'delete' } | null = null;
   private fileInput: HTMLInputElement;
+  private autoFingerInput!: HTMLInputElement;
 
   constructor(private actions: SongsActions) {
     this.fileInput = h('input', { type: 'file', accept: SONG_FILE_TYPES, multiple: true, hidden: true });
@@ -53,6 +57,7 @@ export class SongsView {
         'div.songs-toolbar',
         null,
         h('h1.heading', null, 'Songs'),
+        this.autoFingerBox(),
         h('p.muted.songs-drop-hint', null, 'Drop .mid, .musicxml or .mxl files here, or'),
         h('button.button-primary', { type: 'button', onclick: () => this.fileInput.click() }, icon('upload'), h('span', null, 'Import song')),
         this.fileInput,
@@ -76,7 +81,20 @@ export class SongsView {
     });
   }
 
+  /** The setting is read on refresh: this view is built before the app's settings are in place. */
+  private autoFingerBox(): HTMLElement {
+    const input = (this.autoFingerInput = h('input.checkbox', { type: 'checkbox', id: 'songs-auto-finger' }));
+    input.addEventListener('change', () => this.actions.setAutoFingering(input.checked));
+    return h(
+      'span.checkbox-row.songs-auto-finger',
+      { title: 'Fingering from the file is never changed; suggestions are shown fainter' },
+      input,
+      h('label.muted', { htmlFor: input.id }, 'Suggest fingering where a song has none'),
+    );
+  }
+
   async refresh(): Promise<void> {
+    this.autoFingerInput.checked = this.actions.autoFingering();
     this.entries = await loadSongs();
     this.render();
   }
@@ -94,12 +112,13 @@ export class SongsView {
     const added: string[] = [];
     for (const file of files) {
       try {
-        const pending = await readSongFile(file);
+        const options = { autoFinger: this.actions.autoFingering() };
+        const pending = await readSongFile(file, options);
         if (pending.kind === 'ready') {
           await storage.putSong(pending.record);
           added.push(pending.record.title);
         } else if (!pending.needsSplit) {
-          const record = midiRecord(pending.parsed, pending.fileName);
+          const record = midiRecord(pending.parsed, pending.fileName, undefined, undefined, options);
           await storage.putSong(record);
           added.push(record.title);
         } else {
@@ -139,7 +158,7 @@ export class SongsView {
       const finish = async (ok: boolean) => {
         this.importEl.replaceChildren();
         if (!ok) return resolve(null);
-        const record = midiRecord(parsed, fileName, split);
+        const record = midiRecord(parsed, fileName, split, undefined, { autoFinger: this.actions.autoFingering() });
         await saveSong(record);
         resolve(record.title);
       };

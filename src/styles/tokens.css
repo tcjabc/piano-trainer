@@ -220,6 +220,8 @@
   --split-preview-height: 180px;
   --song-tempo-slider-width: 140px;
   --song-options-width: 340px;
+  /* Suggested (automatic) fingering is drawn this much fainter. */
+  --suggested-opacity: 0.7;
   --metronome-pill-height: 28px;
   --metronome-dot-size: 6px;
   --metronome-dot-size-first: 8px;

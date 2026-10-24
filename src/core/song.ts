@@ -17,6 +17,8 @@ export interface SongNote {
   hand: SongHand;
   /** 1–5 when known. */
   finger: Finger | null;
+  /** The finger was suggested by automatic fingering (not from the score or set by hand). */
+  suggested?: boolean;
   /** Written spelling from MusicXML, e.g. "F#4"; absent for MIDI. */
   spelling?: string;
   /** 0–1 */
