@@ -3,6 +3,7 @@
  * how it is drawn on the staff, heard, and checked when played.
  */
 import { bassNote, chordNotes, pitchClass, voiceChord, type HandSide, type Voiced } from '../../core/chords';
+import { chordFingering, scaleFingering, scaleSequenceFingering } from '../../core/fingerings';
 import type { NotationNote } from '../../core/notation';
 import { scaleSequence, type ScaleDirection } from '../../core/scales';
 import type { HandChoice } from '../../core/settings';
@@ -26,6 +27,28 @@ export function voicings(
       item.kind === 'chord'
         ? voiceChord(item.spec, side)
         : scaleSequence({ tonic: item.tonic, type: item.type, octaves }, side, direction);
+  }
+  return out;
+}
+
+/**
+ * Standard fingers per hand, in the same order as `voicings` (null for a
+ * scale with no standard fingering).
+ */
+export function fingers(
+  item: LibraryItem,
+  hand: HandChoice,
+  octaves: 1 | 2,
+  direction: ScaleDirection = 'up',
+): Partial<Record<HandSide, number[] | null>> {
+  const out: Partial<Record<HandSide, number[] | null>> = {};
+  for (const side of handSides(hand)) {
+    if (item.kind === 'chord') {
+      out[side] = chordFingering(voiceChord(item.spec, side).map((v) => v.midi), side, item.spec.inversion);
+    } else {
+      const up = scaleSequence({ tonic: item.tonic, type: item.type, octaves }, side, 'up').map((v) => v.midi);
+      out[side] = scaleSequenceFingering(scaleFingering(item.tonic, item.type, side, octaves, up), direction === 'updown');
+    }
   }
   return out;
 }

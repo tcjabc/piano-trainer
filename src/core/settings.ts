@@ -76,7 +76,7 @@ export interface Settings {
   midiInputId: string | null;
   theme: ThemePreference;
   hand: HandChoice;
-  /** Show 1–5 on the fingertips of the hand legend. */
+  /** Show fingering (F): finger numbers on keys, the staff and the hand legend. */
   showFingerNumbers: boolean;
   /** On-screen keyboard zoom: 0 fits the full range, 1 shows about two octaves. */
   keyboardZoom: number;

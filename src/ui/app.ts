@@ -214,6 +214,7 @@ export class App {
     this.keyboard.setShowNames(s.showKeyNames);
     this.free.setSettings(s.freePractice);
     this.library.setSettings(s.library);
+    this.library.setFingering(s.showFingerNumbers);
     controls.setBindings(s.controls);
     this.hotkeys.render();
     this.updateKeyboardRange();

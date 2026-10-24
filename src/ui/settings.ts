@@ -221,11 +221,11 @@ export class SettingsView {
           ),
         ),
         form.field(
-          'Finger numbers',
+          'Fingering',
           form.checkbox(
             s.showFingerNumbers,
             (v) => this.commit((x) => (x.showFingerNumbers = v)),
-            'Show 1–5 on the fingertips of the hand legend',
+            'Show finger numbers on keys, staff and hand legend (F)',
           ),
         ),
       ),

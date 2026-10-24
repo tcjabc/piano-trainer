@@ -14,7 +14,7 @@ import type { Keyboard } from '../../ui/keyboard';
 import { formatDegrees, formatNoteName } from '../../ui/note-text';
 import { checkChord, ScaleTracker } from '../drill/check';
 import { ALL_ROOTS, EMPTY_FILTER, filterItems, itemById, type ItemKind, type LibraryFilter, type LibraryItem } from './catalog';
-import { chordTarget, itemKeys, notation, scaleReference } from './voicing';
+import { chordTarget, fingers, itemKeys, notation, scaleReference, voicings } from './voicing';
 
 export interface LibraryActions {
   /** The filter, selection or octaves changed (to be remembered). */
@@ -50,6 +50,7 @@ export class LibraryView {
   private tickEl: HTMLElement;
   private tickTimer = 0;
   private tracker: ScaleTracker | null = null;
+  private showFingering = true;
 
   constructor(
     initial: LibrarySettings,
@@ -147,6 +148,14 @@ export class LibraryView {
   deactivate(): void {
     this.active = false;
     this.keyboard.setHighlights([]);
+    this.keyboard.clearFingers();
+  }
+
+  /** Fingering on or off (F): on the keys and on the staff. */
+  setFingering(visible: boolean): void {
+    if (visible === this.showFingering) return;
+    this.showFingering = visible;
+    this.renderDetail();
   }
 
   focusSearch(): void {
@@ -309,12 +318,31 @@ export class LibraryView {
     drawStaff(drawing, 'grand', notation(item, this.hand, octaves, this.fingersFor(item)), {
       staveWidth: Math.max(260, 70 + count * 38),
     });
-    if (this.active) this.keyboard.setHighlights(itemKeys(item, this.hand, octaves));
+    if (this.active) {
+      this.keyboard.setHighlights(itemKeys(item, this.hand, octaves));
+      this.showFingersOnKeys(item);
+    }
   }
 
-  /** Finger numbers for the staff (filled in when fingering exists). */
-  protected fingersFor(_item: LibraryItem): Parameters<typeof notation>[3] {
-    return {};
+  /** Finger numbers for the staff, when fingering is shown. */
+  private fingersFor(item: LibraryItem): Parameters<typeof notation>[3] {
+    return this.showFingering ? fingers(item, this.hand, this.settings.octaves) : {};
+  }
+
+  /** Finger numbers on the keys (left hand first, so the right hand wins where they share a key). */
+  private showFingersOnKeys(item: LibraryItem): void {
+    this.keyboard.clearFingers();
+    if (!this.showFingering) return;
+    const v = voicings(item, this.hand, this.settings.octaves);
+    const f = fingers(item, this.hand, this.settings.octaves);
+    for (const side of ['L', 'R'] as const) {
+      const list = f[side];
+      if (!list) continue;
+      v[side]?.forEach((note, i) => {
+        const finger = list[i];
+        if (finger) this.keyboard.setFinger(note.midi, { finger: finger as 1 | 2 | 3 | 4 | 5, hand: side });
+      });
+    }
   }
 
   private renderFilters(): void {
