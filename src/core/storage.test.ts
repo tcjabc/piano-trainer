@@ -45,7 +45,7 @@ describe('storage', () => {
     const file = JSON.parse(JSON.stringify(await db.exportAll()));
 
     const other = new Storage(`test-${++n}`);
-    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1, attempts: 0 });
+    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1, attempts: 0, decks: 0 });
     expect(await other.getCards('notes')).toEqual([result.card]);
     expect((await other.getSettings()).theme).toBe('light');
     await other.close();
@@ -83,6 +83,42 @@ describe('storage', () => {
     const upgraded = new Storage(name);
     expect(await upgraded.getCards('notes')).toEqual([card]);
     expect(await upgraded.getAttemptsSince(0)).toEqual([]);
+    await upgraded.close();
+  });
+
+  it('upgrades a version 2 database to add decks, keeping cards and attempts', async () => {
+    const name = `test-${++n}`;
+    const card = newCard({ clef: 'bass', spelling: 'A2', midi: 45 }, NOW);
+    const attempt = {
+      id: 'a1', module: 'notes', mode: 'free', key: card.key, content: card.content,
+      correct: true, responseMs: 900, hinted: false, at: NOW, updatedAt: NOW,
+    };
+    const v2 = await openDB(name, 2, {
+      upgrade(d) {
+        const cards = d.createObjectStore('cards', { keyPath: 'id' });
+        cards.createIndex('key', 'key', { unique: true });
+        cards.createIndex('module', 'module');
+        const reviews = d.createObjectStore('reviews', { keyPath: 'id' });
+        reviews.createIndex('cardId', 'cardId');
+        reviews.createIndex('reviewedAt', 'reviewedAt');
+        d.createObjectStore('settings', { keyPath: 'id' }).createIndex('key', 'key', { unique: true });
+        d.createObjectStore('attempts', { keyPath: 'id' }).createIndex('at', 'at');
+      },
+    });
+    await v2.put('cards', card);
+    await v2.put('attempts', attempt);
+    v2.close();
+
+    const upgraded = new Storage(name);
+    expect(await upgraded.getCards('notes')).toEqual([card]);
+    expect(await upgraded.getAttemptsSince(0)).toEqual([attempt]);
+    expect(await upgraded.getDecks()).toEqual([]);
+    const deck = {
+      id: 'd1', name: 'Triads', filter: { kinds: ['chord'], qualities: ['M'], scaleTypes: [], roots: ['C'], inversions: [] },
+      octaves: 1 as const, starter: false, createdAt: NOW, updatedAt: NOW,
+    } as Parameters<Storage['putDeck']>[0];
+    await upgraded.putDeck(deck);
+    expect((await upgraded.exportAll()).decks).toEqual([deck]);
     await upgraded.close();
   });
 

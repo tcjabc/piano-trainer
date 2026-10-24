@@ -109,6 +109,8 @@ export interface Settings {
   library: LibrarySettings;
   chordDrill: ChordDrillSettings;
   scaleDrill: ScaleDrillSettings;
+  /** The starter decks have been offered (once; they can be deleted). */
+  starterDecksAdded: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -145,6 +147,7 @@ export const DEFAULT_SETTINGS: Settings = {
   library: { filter: EMPTY_FILTER, selected: null, octaves: 1 },
   chordDrill: { newPerDay: 5, showStaff: false },
   scaleDrill: { newPerDay: 3, direction: 'up' },
+  starterDecksAdded: false,
 };
 
 const CLEF_FOR_HAND: Record<HandChoice, ClefChoice> = { left: 'bass', right: 'treble', both: 'both' };

@@ -4,6 +4,7 @@
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { ChordQuality } from './chords';
+import type { LibraryFilter } from './filter';
 import type { Clef } from './pitch';
 import type { ScaleType } from './scales';
 import { withDefaults, type HandChoice, type Settings } from './settings';
@@ -107,6 +108,19 @@ export interface AttemptRecord {
   updatedAt: number;
 }
 
+/** A deck: a saved Library filter, e.g. "minor 7ths in flat keys". */
+export interface DeckRecord {
+  id: string;
+  name: string;
+  filter: LibraryFilter;
+  /** Scales in the deck are practised over this many octaves. */
+  octaves: 1 | 2;
+  /** One of the decks offered on first run. */
+  starter: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ExportFile {
   app: 'piano-trainer';
   schemaVersion: 1;
@@ -116,6 +130,8 @@ export interface ExportFile {
   settings: SettingsRecord[];
   /** Free-practice attempts (missing in exports made before free practice existed). */
   attempts?: AttemptRecord[];
+  /** Decks (missing in exports made before decks existed). */
+  decks?: DeckRecord[];
 }
 
 export interface ImportSummary {
@@ -123,6 +139,7 @@ export interface ImportSummary {
   reviews: number;
   settings: number;
   attempts: number;
+  decks: number;
 }
 
 interface TrainerDB extends DBSchema {
@@ -146,10 +163,14 @@ interface TrainerDB extends DBSchema {
     value: AttemptRecord;
     indexes: { at: number };
   };
+  decks: {
+    key: string;
+    value: DeckRecord;
+  };
 }
 
-/** v1: cards, reviews, settings. v2: free-practice attempts. */
-const DB_VERSION = 2;
+/** v1: cards, reviews, settings. v2: free-practice attempts. v3: decks. */
+const DB_VERSION = 3;
 
 export function uuid(): string {
   return crypto.randomUUID();
@@ -177,6 +198,9 @@ export class Storage {
         if (oldVersion < 2) {
           const attempts = db.createObjectStore('attempts', { keyPath: 'id' });
           attempts.createIndex('at', 'at');
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('decks', { keyPath: 'id' });
         }
       },
     });
@@ -260,6 +284,21 @@ export class Storage {
     return (await this.db()).getAllFromIndex('attempts', 'at', IDBKeyRange.lowerBound(since));
   }
 
+  // ── Decks ──────────────────────────────────────────────────────────────
+
+  async getDecks(): Promise<DeckRecord[]> {
+    const decks = await (await this.db()).getAll('decks');
+    return decks.sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  async putDeck(deck: DeckRecord): Promise<void> {
+    await (await this.db()).put('decks', deck);
+  }
+
+  async deleteDeck(id: string): Promise<void> {
+    await (await this.db()).delete('decks', id);
+  }
+
   // ── Settings ───────────────────────────────────────────────────────────
 
   async getSettings(): Promise<Settings> {
@@ -285,6 +324,7 @@ export class Storage {
       reviews: await db.getAll('reviews'),
       settings: await db.getAll('settings'),
       attempts: await db.getAll('attempts'),
+      decks: await db.getAll('decks'),
     };
   }
 
@@ -295,8 +335,8 @@ export class Storage {
   async importAll(data: unknown): Promise<ImportSummary> {
     const file = validateExport(data);
     const db = await this.db();
-    const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts'], 'readwrite');
-    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0 };
+    const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts', 'decks'], 'readwrite');
+    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0, decks: 0 };
 
     const cards = tx.objectStore('cards');
     for (const incoming of file.cards) {
@@ -335,6 +375,14 @@ export class Storage {
       summary.attempts++;
     }
 
+    const decks = tx.objectStore('decks');
+    for (const incoming of file.decks ?? []) {
+      const existing = await decks.get(incoming.id);
+      if (existing && existing.updatedAt >= incoming.updatedAt) continue;
+      await decks.put(incoming);
+      summary.decks++;
+    }
+
     await tx.done;
     return summary;
   }
@@ -348,7 +396,7 @@ function validateExport(data: unknown): ExportFile {
   const hasIds = (rows: unknown) =>
     Array.isArray(rows) &&
     rows.every((r) => typeof r?.id === 'string' && typeof r?.updatedAt === 'number');
-  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || (f.attempts !== undefined && !hasIds(f.attempts))) {
+  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || (f.attempts !== undefined && !hasIds(f.attempts)) || (f.decks !== undefined && !hasIds(f.decks))) {
     throw new Error('The export file is incomplete or damaged.');
   }
   return f as ExportFile;

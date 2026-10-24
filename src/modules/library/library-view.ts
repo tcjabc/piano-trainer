@@ -40,6 +40,8 @@ export class LibraryView {
   private active = false;
   private search: HTMLInputElement;
   private filtersEl: HTMLElement;
+  /** Below the filters: the decks. */
+  private extrasEl: HTMLElement;
   private countEl: HTMLElement;
   private listEl: HTMLElement;
   private detailEl: HTMLElement;
@@ -76,6 +78,7 @@ export class LibraryView {
       }
     });
     this.filtersEl = h('div.library-filter-groups');
+    this.extrasEl = h('div.library-sidebar-extras');
     this.countEl = h('p.library-count.num.muted');
     this.listEl = h('div.library-list', { role: 'listbox', 'aria-label': 'Chords and scales' });
     this.listEl.addEventListener('click', (e) => {
@@ -87,13 +90,18 @@ export class LibraryView {
     this.el = h(
       'div.library',
       null,
-      h('aside.library-filters', { 'aria-label': 'Filters' }, this.search, this.filtersEl),
+      h('aside.library-filters', { 'aria-label': 'Filters' }, this.search, this.filtersEl, this.extrasEl),
       h('div.library-results', null, this.countEl, this.listEl),
       this.detailEl,
     );
     this.selected = (this.settings.selected && itemById(this.settings.selected)) || null;
     this.renderFilters();
     this.refresh();
+  }
+
+  /** Put a panel (the decks) under the filters. */
+  setSidebarExtras(el: HTMLElement): void {
+    this.extrasEl.replaceChildren(el);
   }
 
   get current(): LibraryItem | null {

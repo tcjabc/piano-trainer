@@ -17,7 +17,7 @@ import { DEFAULT_KEY_RANGE, keyRangeForDevice, midi, type KeyRange } from '../co
 import { notationReady } from '../core/notation';
 import { spellingToMidi } from '../core/pitch';
 import { noteDrillOptions, type HandChoice, type LibrarySettings, type Settings } from '../core/settings';
-import { storage } from '../core/storage';
+import { storage, uuid, type DeckRecord } from '../core/storage';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
 import { Drill } from '../modules/drill/drill';
@@ -26,7 +26,8 @@ import { FreeSource, ReviewSource } from '../modules/drill/sources';
 import { HAND_LABELS } from '../modules/drill/tasks';
 import { freeContents, freeRange, staffForHand } from '../modules/notes/free';
 import { FreePracticeView } from '../modules/notes/free-view';
-import { filterItems, type ItemKind, type LibraryItem } from '../modules/library/catalog';
+import { filterItems, STARTER_DECKS, type ItemKind, type LibraryItem } from '../modules/library/catalog';
+import { DecksPanel } from '../modules/library/decks-view';
 import { LibraryView } from '../modules/library/library-view';
 import { relativeDue, ReviewIndex } from '../modules/library/review-index';
 import { PlayView } from '../modules/play/play-view';
@@ -72,6 +73,8 @@ export class App {
   private drillReturn: 'today' | 'free' | 'library' = 'today';
   /** Which chords and scales are in review. */
   private reviews = new ReviewIndex();
+  private decks: DeckRecord[] = [];
+  private decksPanel: DecksPanel;
   /** The Study screen to return to from settings. */
   private lastStudy: 'today' | 'free' = 'today';
   /** Keys of the connected keyboard (or the 61-key default). */
@@ -119,6 +122,17 @@ export class App {
     );
     this.library.detailExtras = (item) => this.libraryExtras(item);
     this.library.rowBadge = (item) => this.libraryBadge(item);
+    this.decksPanel = new DecksPanel({
+      apply: (deck) => this.library.applyFilter(deck.filter, deck.octaves),
+      create: (name) => void this.saveDeck({ name }),
+      rename: (deck, name) => void this.saveDeck({ ...deck, name }),
+      useCurrentFilters: (deck) => void this.saveDeck({ ...deck, filter: this.library.filter, octaves: this.library.octaves }),
+      remove: (deck) => void this.removeDeck(deck),
+      addAll: (deck) => void this.addDeckToReview(deck),
+      practise: (deck) => this.startFreeItems(this.deckItems(deck), staffForHand(this.settings.hand), 'library'),
+      progress: (deck) => this.deckProgress(deck),
+    });
+    this.library.setSidebarExtras(this.decksPanel.el);
     this.free = new FreePracticeView(settings.freePractice, {
       change: (freePractice) => void this.patchSettings({ freePractice }),
       start: () => this.startFree(),
@@ -155,8 +169,75 @@ export class App {
       midi.init(this.settings.midiInputId),
       notationReady().then(() => this.play.render()),
       this.refreshSummary(),
-      this.reviews.load().then(() => this.library.refreshDetail()),
+      this.reviews.load().then(() => {
+        this.library.refreshDetail();
+        this.decksPanel.refresh();
+      }),
+      this.loadDecks(),
     ]);
+  }
+
+  // ── Decks ────────────────────────────────────────────────────────────
+
+  /** Load decks; on first run, add the starter decks (nothing goes into review). */
+  private async loadDecks(): Promise<void> {
+    if (!this.settings.starterDecksAdded) {
+      const now = Date.now();
+      for (const [i, d] of STARTER_DECKS.entries()) {
+        await storage.putDeck({
+          id: uuid(),
+          name: d.name,
+          filter: d.filter,
+          octaves: d.octaves ?? 1,
+          starter: true,
+          createdAt: now + i,
+          updatedAt: now,
+        });
+      }
+      await this.patchSettings({ starterDecksAdded: true });
+    }
+    this.decks = await storage.getDecks();
+    this.decksPanel.setDecks(this.decks);
+  }
+
+  private async saveDeck(patch: Partial<DeckRecord> & { name: string }): Promise<void> {
+    const now = Date.now();
+    const deck: DeckRecord = {
+      id: patch.id ?? uuid(),
+      name: patch.name,
+      filter: patch.filter ?? this.library.filter,
+      octaves: patch.octaves ?? this.library.octaves,
+      starter: patch.starter ?? false,
+      createdAt: patch.createdAt ?? now,
+      updatedAt: now,
+    };
+    await storage.putDeck(deck);
+    await this.loadDecks();
+  }
+
+  private async removeDeck(deck: DeckRecord): Promise<void> {
+    await storage.deleteDeck(deck.id);
+    await this.loadDecks();
+  }
+
+  /** A deck's items as cards for the current hand (scales at the deck's octaves). */
+  private deckItems(deck: DeckRecord): DrillItem[] {
+    return filterItems(deck.filter)
+      .filter((i) => REVIEWABLE.has(i.kind))
+      .map((i) => itemContent(i, this.settings.hand, deck.octaves));
+  }
+
+  private deckProgress(deck: DeckRecord): { total: number; inReview: number; due: number } {
+    const items = this.deckItems(deck);
+    const states = items.map((i) => this.reviews.state(i.id));
+    return { total: items.length, inReview: states.filter((s) => s !== 'none').length, due: states.filter((s) => s === 'due').length };
+  }
+
+  private async addDeckToReview(deck: DeckRecord): Promise<void> {
+    await this.reviews.addAll(this.deckItems(deck));
+    this.decksPanel.refresh();
+    this.library.refreshDetail();
+    void this.refreshSummary();
   }
 
   /** True while a drill is running (an update then waits for the user). */
@@ -530,6 +611,7 @@ export class App {
     if (this.reviews.inReview(content.id)) await this.reviews.remove(content.id);
     else await this.reviews.add(content);
     this.library.refreshDetail();
+    this.decksPanel.refresh();
     void this.refreshSummary();
   }
 
@@ -643,6 +725,7 @@ export class App {
     await this.updateSettings(next);
     this.library.setHand(hand);
     this.library.refreshDetail();
+    this.decksPanel.refresh();
     if (this.screen === 'drill' && this.drillKind === 'review' && !(await this.startDrill(this.drillAhead))) this.show('today');
   }
 
@@ -688,7 +771,10 @@ export class App {
       this.applySettings();
       midi.select(this.settings.midiInputId);
       await this.refreshSummary();
-      return `Imported ${result.cards} cards, ${result.reviews} reviews and ${result.settings} settings records.`;
+      await this.reviews.load();
+      await this.loadDecks();
+      this.library.refreshDetail();
+      return `Imported ${result.cards} cards, ${result.reviews} reviews, ${result.decks} decks and ${result.settings} settings records.`;
     } catch (err) {
       return err instanceof SyntaxError ? 'That file is not valid JSON.' : (err as Error).message;
     }

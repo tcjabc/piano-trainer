@@ -1334,3 +1334,63 @@ select.control {
   font-size: var(--text-caption);
   letter-spacing: var(--tracking-caption);
 }
+
+/* ── Decks (Library sidebar) ────────────────────────────────────────────── */
+
+.library-decks {
+  display: grid;
+  gap: var(--spacing-10);
+  padding-top: var(--spacing-20);
+  border-top: var(--border-divider) solid var(--color-border);
+}
+
+.deck-new {
+  justify-self: start;
+}
+
+.deck {
+  display: grid;
+  gap: var(--spacing-5);
+  padding-bottom: var(--spacing-10);
+  border-bottom: var(--border-hairline) solid var(--color-border);
+}
+
+.deck-title {
+  justify-self: start;
+  padding: 0;
+  border: none;
+  background: none;
+  font-weight: var(--font-weight-bold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.deck-title:hover {
+  text-decoration: underline;
+}
+
+.deck-progress {
+  font-size: var(--text-caption);
+}
+
+.deck-actions,
+.deck-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-5);
+}
+
+.deck-actions .button-outline,
+.deck-edit .button-outline {
+  height: auto;
+  padding: var(--spacing-2) var(--spacing-8);
+}
+
+.deck-editing {
+  display: grid;
+  gap: var(--spacing-5);
+}
+
+.deck-name-input {
+  flex: 1 1 100%;
+}
