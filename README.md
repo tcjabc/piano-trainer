@@ -55,6 +55,11 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
 ### Study
 
 - **Today** shows how many cards are due and roughly how long they take. Press **Space** (or Start) to go through them back to back. When nothing is due, Space starts **Practise ahead** (a few unseen cards plus the soonest-due ones).
+- **Free practice** (the tab next to Today, or **E**) drills whatever you choose, in random order with no limit:
+  - **Choosing notes:** pick a hand (bass, treble or grand staff), then either a range per clef (with ledger-line and accidental options) or specific keys. To pick keys, play them on your keyboard or click the on-screen keys; doing it again removes them.
+  - **Nothing changes your schedule:** attempts are logged, marked as free practice, in a separate `attempts` store and included in the export.
+  - **Remembered:** your last selection is kept, and 1/2/3 switch its hand.
+  - **Later:** Chords and Scales are listed for the Phase 2 library.
 - Each note (clef + written pitch) is its own card. Grading is automatic: wrong = Again; correct in under 1 s = Easy, 1–3 s = Good, over 3 s = Hard. Hearing the note first (H) caps the grade at Hard.
 - A wrong note flashes red on the key you played and marks the correct key; the card waits until you play it. Failed cards come back later in the same session.
 - New cards are introduced up to a daily limit (default 10), starting at middle C and working outwards. C♯ and D♭ are separate cards (different staff positions) answered by the same key.
@@ -69,6 +74,7 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
 | S | Settings (from Today) |
 | 1 / 2 / 3 | Practise the left hand / right hand / both |
 | P / T | Go to Play / Study (on every screen) |
+| E | Free practice |
 | ← | Previous card, replayed as ungraded practice |
 | F | Fingertip numbers on/off (fingering) |
 | - / = / 0 | Zoom the on-screen keyboard out / in / fit the full range |
@@ -140,7 +146,7 @@ src/
 build/vadivam.ts Vite plugin that inlines the Vadivam icons listed in src/ui/icon-list.ts
 ```
 
-Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later.
+Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later. Stores: `cards`, `reviews` (FSRS reviews), `settings` and `attempts` (free practice; database version 2 adds it without touching existing data).
 
 ## Design
 

@@ -4,7 +4,8 @@
  * the keyboard, with the hand legend beside it in Study.
  *
  * Areas: Play (home: free playing, live staff, chord names, visualiser;
- * nothing is recorded) and Study (Today queue and drills).
+ * nothing is recorded) and Study (Today's review queue, and free practice
+ * whose attempts are logged but never change the schedule).
  * Routes MIDI input to sound, the on-screen keyboard, Play and the drill;
  * learned controller buttons and knobs run actions through the same
  * shortcuts as the computer keyboard.
@@ -19,6 +20,9 @@ import { storage } from '../core/storage';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
 import { NoteDrill } from '../modules/notes/drill';
+import { freeContents, freeRange, staffForHand } from '../modules/notes/free';
+import { FreePracticeView } from '../modules/notes/free-view';
+import { FreeSource, ReviewSource } from '../modules/notes/sources';
 import { PlayView } from '../modules/play/play-view';
 import { Visualiser } from '../modules/play/visualiser';
 import { h } from './dom';
@@ -29,11 +33,12 @@ import { Keyboard } from './keyboard';
 import { SettingsView } from './settings';
 import { StaffView } from './staff';
 import { applyTheme } from './theme';
+import { StudyNav } from './study-nav';
 import { TodayView } from './today';
 import { UpdateToast } from './update-toast';
 import { ZoomControl } from './zoom-control';
 
-type Screen = 'play' | 'today' | 'drill' | 'settings';
+type Screen = 'play' | 'today' | 'free' | 'drill' | 'settings';
 
 const SUSTAIN_CC = 64;
 /** MIDI channel 10 (drum channel), where controller pads usually send. */
@@ -52,6 +57,10 @@ export class App {
   private summary: TodaySummary | null = null;
   /** Whether the running drill is practising ahead. */
   private drillAhead = false;
+  /** What the running drill is: today's reviews or free practice. */
+  private drillKind: 'review' | 'free' = 'review';
+  /** The Study screen to return to from settings. */
+  private lastStudy: 'today' | 'free' = 'today';
   /** Keys of the connected keyboard (or the 61-key default). */
   private deviceRange: KeyRange = DEFAULT_KEY_RANGE;
   private knobSaveTimer = 0;
@@ -72,6 +81,8 @@ export class App {
   private today = new TodayView({ start: () => this.startDrill(false), practiseAhead: () => this.startDrill(true) });
   private settingsView: SettingsView;
   private drill: NoteDrill;
+  private studyNav = new StudyNav((view) => this.show(view));
+  private free: FreePracticeView;
 
   constructor(private root: HTMLElement, settings: Settings) {
     this.settings = settings;
@@ -83,8 +94,11 @@ export class App {
       cancelLearn: () => controls.cancelLearn(),
     });
     this.drill = new NoteDrill(this.staff, this.keyboard, {
-      reviewed: () => void this.refreshSummary(),
-      finished: () => this.show('today'),
+      finished: () => this.show(this.drillKind === 'free' ? 'free' : 'today'),
+    });
+    this.free = new FreePracticeView(settings.freePractice, {
+      change: (freePractice) => void this.patchSettings({ freePractice }),
+      start: () => this.startFree(),
     });
   }
 
@@ -104,7 +118,7 @@ export class App {
     this.applySettings();
     this.zoom.on('input', (z) => this.keyboard.setZoom(z));
     this.zoom.on('commit', (z) => void this.patchSettings({ keyboardZoom: z }));
-    this.hands.on('change', (hand) => void this.setHand(hand));
+    this.hands.on('change', (hand) => (this.inFreePractice ? this.setFreeHand(hand) : void this.setHand(hand)));
     this.wireControls();
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.visualiser.refreshTokens());
     this.wireInput();
@@ -183,11 +197,12 @@ export class App {
     this.visualiser.refreshTokens();
     this.visualiser.setMode(s.visualiser.colors);
     this.visualiser.setEmbers(s.visualiser.sparks);
-    this.hands.set(s.hand);
+    this.hands.set(this.inFreePractice ? s.freePractice.notes.hand : s.hand);
     this.hands.setNumbersVisible(s.showFingerNumbers);
     this.zoom.set(s.keyboardZoom);
     this.keyboard.setZoom(s.keyboardZoom);
     this.keyboard.setShowNames(s.showKeyNames);
+    this.free.setSettings(s.freePractice);
     controls.setBindings(s.controls);
     this.hotkeys.render();
     this.updateKeyboardRange();
@@ -219,6 +234,7 @@ export class App {
       if (this.visualiserOn) this.keyboard.setLit(note, this.visualiser.colorFor(note));
       if (this.screen === 'play') this.play.setHeld(this.held);
       if (this.screen === 'drill') this.drill.noteOn(note, time);
+      if (this.screen === 'free' && this.free.picking) this.free.toggleKey(note);
     };
     const midiNoteOn = (note: number, velocity: number, time: number) => {
       // Scroll to keys played on the MIDI keyboard (on-screen presses are already in view).
@@ -254,10 +270,17 @@ export class App {
     this.keyboard.on('release', (e) => noteOff(e.note));
   }
 
-  /** Go to an area's home screen: Play, or Today for Study. */
+  /** Go to an area's home screen: Play, or Today for Study (a running review session stays). */
   private showArea(area: Area): void {
     if (area === 'play' && this.screen !== 'play') this.show('play');
-    if (area === 'study' && this.screen !== 'today' && this.screen !== 'drill') this.show('today');
+    const inReviews = this.screen === 'today' || (this.screen === 'drill' && this.drillKind === 'review');
+    if (area === 'study' && !inReviews) this.show('today');
+  }
+
+  /** Study screens show the Today / Free practice switch above their panel. */
+  private studyStage(view: 'today' | 'free', panel: HTMLElement): HTMLElement {
+    this.studyNav.set(view);
+    return h('div.study', null, this.studyNav.el, panel);
   }
 
   private show(screen: Screen): void {
@@ -265,8 +288,10 @@ export class App {
     if (this.screen === 'settings' && screen !== 'settings') this.settingsView.stopLearning(null);
     this.screen = screen;
     if (screen !== 'settings') this.lastArea = screen === 'play' ? 'play' : 'study';
+    if (screen === 'today' || screen === 'free') this.lastStudy = screen;
     this.root.querySelector('.app')?.setAttribute('data-screen', screen);
     this.header.setArea(screen === 'settings' ? null : this.lastArea);
+    this.hands.set(this.inFreePractice ? this.settings.freePractice.notes.hand : this.settings.hand);
     this.updateVisualiser();
 
     if (screen === 'play') {
@@ -274,9 +299,20 @@ export class App {
       this.play.setHeld(this.held);
       this.setPlayHotkeys();
     } else if (screen === 'today') {
-      this.stage.replaceChildren(this.today.el);
+      this.stage.replaceChildren(this.studyStage('today', this.today.el));
       this.setTodayHotkeys();
       void this.refreshSummary();
+    } else if (screen === 'free') {
+      this.stage.replaceChildren(this.studyStage('free', this.free.el));
+      this.hotkeys.set([
+        { keys: [' ', 'Enter'], label: 'Space', hint: 'Start', action: 'start-pause', run: () => this.startFree() },
+        { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', run: () => this.setFreeHand('left') },
+        { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => this.setFreeHand('right') },
+        { keys: ['3'], label: '3', hint: '', hidden: true, action: 'hand-both', run: () => this.setFreeHand('both') },
+        { keys: ['Escape'], label: 'Esc', hint: 'Today', action: 'back', run: () => this.show('today') },
+        { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
+        ...this.commonHotkeys(),
+      ]);
     } else if (screen === 'drill') {
       this.stage.replaceChildren(this.staff.el);
       this.hotkeys.set([
@@ -285,12 +321,14 @@ export class App {
         { keys: ['ArrowRight'], label: '→', hint: 'Skip', action: 'next', run: () => this.drill.skip() },
         { keys: ['ArrowLeft'], label: '←', hint: 'Previous', action: 'previous', hidden: true, run: () => this.drill.previous() },
         { keys: ['h'], label: 'H', hint: 'Hear note', action: 'hear', run: () => this.drill.hint() },
-        { keys: ['Escape'], label: 'Esc', hint: 'Today', action: 'back', run: () => this.show('today') },
-        ...this.handHotkeys(),
+        this.drillKind === 'free'
+          ? { keys: ['Escape'], label: 'Esc', hint: 'Free practice', action: 'back', run: () => this.show('free') }
+          : { keys: ['Escape'], label: 'Esc', hint: 'Today', action: 'back', run: () => this.show('today') },
+        ...(this.drillKind === 'review' ? this.handHotkeys() : this.freeHandHotkeys()),
         ...this.commonHotkeys(),
       ]);
     } else {
-      const back: Screen = this.lastArea === 'play' ? 'play' : 'today';
+      const back: Screen = this.lastArea === 'play' ? 'play' : this.lastStudy;
       this.stage.replaceChildren(this.settingsView.el);
       this.hotkeys.set([
         { keys: ['Escape'], label: 'Esc', hint: back === 'play' ? 'Play' : 'Today', action: 'back', run: () => this.show(back) },
@@ -336,9 +374,45 @@ export class App {
     (document.activeElement as HTMLElement | null)?.blur();
     this.drill.stop();
     this.drillAhead = ahead;
+    this.drillKind = 'review';
     this.show('drill');
-    this.drill.start(cards, noteDrillOptions(this.settings), { ahead });
+    const clef = noteDrillOptions(this.settings).clef;
+    this.drill.start(
+      new ReviewSource(cards, clef === 'both' ? 'grand' : clef, { ahead }, () => void this.refreshSummary()),
+    );
     return true;
+  }
+
+  /** Free practice has its own hand; the legend and 1/2/3 follow it on its screens. */
+  private get inFreePractice(): boolean {
+    return this.screen === 'free' || (this.screen === 'drill' && this.drillKind === 'free');
+  }
+
+  /** Change the free-practice hand; a running free drill restarts with the new set. */
+  private setFreeHand(hand: HandChoice): void {
+    this.free.setHand(hand); // saves through the view's change callback
+    this.hands.set(hand);
+    if (this.screen === 'drill') this.startFree();
+  }
+
+  private freeHandHotkeys(): Hotkey[] {
+    return [
+      { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', run: () => this.setFreeHand('left') },
+      { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => this.setFreeHand('right') },
+      { keys: ['3'], label: '3', hint: '', hidden: true, action: 'hand-both', run: () => this.setFreeHand('both') },
+    ];
+  }
+
+  /** Free practice: random cards from the chosen set, no limit, schedule untouched. */
+  private startFree(): void {
+    const notes = this.settings.freePractice.notes;
+    const contents = freeContents(notes);
+    if (contents.length === 0) return;
+    (document.activeElement as HTMLElement | null)?.blur();
+    this.drill.stop();
+    this.drillKind = 'free';
+    this.show('drill');
+    this.drill.start(new FreeSource(contents, staffForHand(notes.hand)));
   }
 
   private async refreshSummary(): Promise<TodaySummary> {
@@ -360,6 +434,7 @@ export class App {
         action: 'start-pause',
         run: () => this.today.primaryAction(),
       },
+      { keys: ['e'], label: 'E', hint: 'Free practice', run: () => this.show('free') },
       { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
       ...this.handHotkeys(),
       ...this.commonHotkeys(),
@@ -383,6 +458,7 @@ export class App {
       { keys: ['0'], label: '0', hint: '', hidden: true, run: () => this.zoom.fit() },
       { keys: ['p'], label: 'P', hint: '', hidden: true, action: 'area-play', run: () => this.showArea('play') },
       { keys: ['t'], label: 'T', hint: '', hidden: true, action: 'area-study', run: () => this.showArea('study') },
+      { keys: ['e'], label: 'E', hint: '', hidden: true, run: () => this.show('free') },
       {
         keys: ['f'],
         label: 'F',
@@ -431,8 +507,9 @@ export class App {
     this.deviceRange = device;
     const d = noteDrillOptions(this.settings);
     const clefs = clefsFor(d);
-    const low = Math.min(device.low, ...clefs.map((c) => spellingToMidi(d[c].low)));
-    const high = Math.max(device.high, ...clefs.map((c) => spellingToMidi(d[c].high)));
+    const free = freeRange(this.settings.freePractice.notes) ?? [device.low, device.high];
+    const low = Math.min(device.low, free[0], ...clefs.map((c) => spellingToMidi(d[c].low)));
+    const high = Math.max(device.high, free[1], ...clefs.map((c) => spellingToMidi(d[c].high)));
     this.keyboard.setRange(low, high);
   }
 

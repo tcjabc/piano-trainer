@@ -61,6 +61,25 @@ export interface SettingsRecord {
   updatedAt: number;
 }
 
+/**
+ * One answer in free practice. Logged for the record only: it never changes
+ * a card or the review schedule (those live in `cards` and `reviews`).
+ */
+export interface AttemptRecord {
+  id: string;
+  module: CardRecord['module'];
+  mode: 'free';
+  /** Same form as a card key, e.g. "notes:treble:C#4" (the card may not exist). */
+  key: string;
+  content: NoteCardContent;
+  correct: boolean;
+  responseMs: number;
+  /** The note was heard (H) before answering. */
+  hinted: boolean;
+  at: number;
+  updatedAt: number;
+}
+
 export interface ExportFile {
   app: 'piano-trainer';
   schemaVersion: 1;
@@ -68,12 +87,15 @@ export interface ExportFile {
   cards: CardRecord[];
   reviews: ReviewRecord[];
   settings: SettingsRecord[];
+  /** Free-practice attempts (missing in exports made before free practice existed). */
+  attempts?: AttemptRecord[];
 }
 
 export interface ImportSummary {
   cards: number;
   reviews: number;
   settings: number;
+  attempts: number;
 }
 
 interface TrainerDB extends DBSchema {
@@ -92,7 +114,15 @@ interface TrainerDB extends DBSchema {
     value: SettingsRecord;
     indexes: { key: string };
   };
+  attempts: {
+    key: string;
+    value: AttemptRecord;
+    indexes: { at: number };
+  };
 }
+
+/** v1: cards, reviews, settings. v2: free-practice attempts. */
+const DB_VERSION = 2;
 
 export function uuid(): string {
   return crypto.randomUUID();
@@ -104,16 +134,23 @@ export class Storage {
   constructor(private readonly name = 'piano-trainer') {}
 
   private db(): Promise<IDBPDatabase<TrainerDB>> {
-    this.dbPromise ??= openDB<TrainerDB>(this.name, 1, {
-      upgrade(db) {
-        const cards = db.createObjectStore('cards', { keyPath: 'id' });
-        cards.createIndex('key', 'key', { unique: true });
-        cards.createIndex('module', 'module');
-        const reviews = db.createObjectStore('reviews', { keyPath: 'id' });
-        reviews.createIndex('cardId', 'cardId');
-        reviews.createIndex('reviewedAt', 'reviewedAt');
-        const settings = db.createObjectStore('settings', { keyPath: 'id' });
-        settings.createIndex('key', 'key', { unique: true });
+    this.dbPromise ??= openDB<TrainerDB>(this.name, DB_VERSION, {
+      // Only adds what an older database is missing; existing data is left alone.
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const cards = db.createObjectStore('cards', { keyPath: 'id' });
+          cards.createIndex('key', 'key', { unique: true });
+          cards.createIndex('module', 'module');
+          const reviews = db.createObjectStore('reviews', { keyPath: 'id' });
+          reviews.createIndex('cardId', 'cardId');
+          reviews.createIndex('reviewedAt', 'reviewedAt');
+          const settings = db.createObjectStore('settings', { keyPath: 'id' });
+          settings.createIndex('key', 'key', { unique: true });
+        }
+        if (oldVersion < 2) {
+          const attempts = db.createObjectStore('attempts', { keyPath: 'id' });
+          attempts.createIndex('at', 'at');
+        }
       },
     });
     return this.dbPromise;
@@ -182,6 +219,16 @@ export class Storage {
     return out;
   }
 
+  // ── Free-practice attempts ─────────────────────────────────────────────
+
+  async addAttempt(attempt: AttemptRecord): Promise<void> {
+    await (await this.db()).put('attempts', attempt);
+  }
+
+  async getAttemptsSince(since: number): Promise<AttemptRecord[]> {
+    return (await this.db()).getAllFromIndex('attempts', 'at', IDBKeyRange.lowerBound(since));
+  }
+
   // ── Settings ───────────────────────────────────────────────────────────
 
   async getSettings(): Promise<Settings> {
@@ -206,6 +253,7 @@ export class Storage {
       cards: await db.getAll('cards'),
       reviews: await db.getAll('reviews'),
       settings: await db.getAll('settings'),
+      attempts: await db.getAll('attempts'),
     };
   }
 
@@ -216,8 +264,8 @@ export class Storage {
   async importAll(data: unknown): Promise<ImportSummary> {
     const file = validateExport(data);
     const db = await this.db();
-    const tx = db.transaction(['cards', 'reviews', 'settings'], 'readwrite');
-    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0 };
+    const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts'], 'readwrite');
+    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0 };
 
     const cards = tx.objectStore('cards');
     for (const incoming of file.cards) {
@@ -248,6 +296,14 @@ export class Storage {
       summary.settings++;
     }
 
+    const attempts = tx.objectStore('attempts');
+    for (const incoming of file.attempts ?? []) {
+      const existing = await attempts.get(incoming.id);
+      if (existing && existing.updatedAt >= incoming.updatedAt) continue;
+      await attempts.put(incoming);
+      summary.attempts++;
+    }
+
     await tx.done;
     return summary;
   }
@@ -261,7 +317,7 @@ function validateExport(data: unknown): ExportFile {
   const hasIds = (rows: unknown) =>
     Array.isArray(rows) &&
     rows.every((r) => typeof r?.id === 'string' && typeof r?.updatedAt === 'number');
-  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings)) {
+  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || (f.attempts !== undefined && !hasIds(f.attempts))) {
     throw new Error('The export file is incomplete or damaged.');
   }
   return f as ExportFile;

@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newCard } from '../modules/notes/cards';
 import { recordReview, Rating } from './scheduler';
@@ -44,7 +45,7 @@ describe('storage', () => {
     const file = JSON.parse(JSON.stringify(await db.exportAll()));
 
     const other = new Storage(`test-${++n}`);
-    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1 });
+    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1, attempts: 0 });
     expect(await other.getCards('notes')).toEqual([result.card]);
     expect((await other.getSettings()).theme).toBe('light');
     await other.close();
@@ -60,6 +61,29 @@ describe('storage', () => {
     expect((await db.importAll({ ...file, cards: [newer] })).cards).toBe(1);
     const cards = await db.getCards('notes');
     expect(cards.map((c) => c.id)).toEqual([newer.id]);
+  });
+
+  it('upgrades a version 1 database without touching its data', async () => {
+    const name = `test-${++n}`;
+    const card = newCard({ clef: 'treble', spelling: 'D4', midi: 62 }, NOW);
+    const v1 = await openDB(name, 1, {
+      upgrade(d) {
+        const cards = d.createObjectStore('cards', { keyPath: 'id' });
+        cards.createIndex('key', 'key', { unique: true });
+        cards.createIndex('module', 'module');
+        const reviews = d.createObjectStore('reviews', { keyPath: 'id' });
+        reviews.createIndex('cardId', 'cardId');
+        reviews.createIndex('reviewedAt', 'reviewedAt');
+        d.createObjectStore('settings', { keyPath: 'id' }).createIndex('key', 'key', { unique: true });
+      },
+    });
+    await v1.put('cards', card);
+    v1.close();
+
+    const upgraded = new Storage(name);
+    expect(await upgraded.getCards('notes')).toEqual([card]);
+    expect(await upgraded.getAttemptsSince(0)).toEqual([]);
+    await upgraded.close();
   });
 
   it('rejects files that are not exports', async () => {

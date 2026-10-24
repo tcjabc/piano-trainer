@@ -39,6 +39,28 @@ export interface NoteDrillOptions extends NoteDrillSettings {
   clef: ClefChoice;
 }
 
+/** Free practice: what to drill, chosen freely; served at random with no limit. */
+export interface FreeNoteSettings {
+  hand: HandChoice;
+  /** A range per clef, or a hand-picked set of keys. */
+  selection: 'range' | 'specific';
+  treble: NoteRange;
+  bass: NoteRange;
+  ledgerLines: boolean;
+  /** Include sharps/flats (for picked black keys: both spellings, otherwise sharps only). */
+  accidentals: boolean;
+  /** Picked keys (MIDI numbers) for the "specific" selection. */
+  specific: number[];
+}
+
+/** What free practice drills. Only notes for now; chords and scales come with the library. */
+export type FreePracticeKind = 'notes';
+
+export interface FreePracticeSettings {
+  kind: FreePracticeKind;
+  notes: FreeNoteSettings;
+}
+
 export interface Settings {
   /** Selected MIDI input id; null means auto-select. */
   midiInputId: string | null;
@@ -54,6 +76,8 @@ export interface Settings {
   /** Controller buttons, pads and knobs learned for app actions. */
   controls: ControlMap;
   noteDrill: NoteDrillSettings;
+  /** The last free-practice selection, remembered. */
+  freePractice: FreePracticeSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -72,12 +96,28 @@ export const DEFAULT_SETTINGS: Settings = {
     accidentals: false,
     newPerDay: 10,
   },
+  freePractice: {
+    kind: 'notes',
+    notes: {
+      hand: 'right',
+      selection: 'range',
+      treble: { low: 'C4', high: 'G4' },
+      bass: { low: 'C3', high: 'G3' },
+      ledgerLines: true,
+      accidentals: false,
+      specific: [],
+    },
+  },
 };
 
 const CLEF_FOR_HAND: Record<HandChoice, ClefChoice> = { left: 'bass', right: 'treble', both: 'both' };
 const HAND_FOR_CLEF: Record<ClefChoice, HandChoice> = { bass: 'left', treble: 'right', both: 'both' };
 
 /** Left hand reads the bass clef, right hand the treble, both hands the grand staff. */
+export function clefForHand(hand: HandChoice): ClefChoice {
+  return CLEF_FOR_HAND[hand];
+}
+
 export function noteDrillOptions(settings: Settings): NoteDrillOptions {
   return { ...settings.noteDrill, clef: CLEF_FOR_HAND[settings.hand] };
 }
@@ -103,6 +143,16 @@ export function withDefaults(partial: LegacySettings | undefined): Settings {
     hand: partial?.hand ?? (legacyClef ? HAND_FOR_CLEF[legacyClef] : DEFAULT_SETTINGS.hand),
     visualiser: visualiserWithDefaults(partial?.visualiser),
     controls: { ...partial?.controls },
+    freePractice: {
+      ...DEFAULT_SETTINGS.freePractice,
+      ...partial?.freePractice,
+      notes: {
+        ...DEFAULT_SETTINGS.freePractice.notes,
+        ...partial?.freePractice?.notes,
+        treble: { ...DEFAULT_SETTINGS.freePractice.notes.treble, ...partial?.freePractice?.notes?.treble },
+        bass: { ...DEFAULT_SETTINGS.freePractice.notes.bass, ...partial?.freePractice?.notes?.bass },
+      },
+    },
     noteDrill: {
       ...DEFAULT_SETTINGS.noteDrill,
       ...noteDrill,

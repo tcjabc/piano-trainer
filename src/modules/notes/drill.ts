@@ -1,29 +1,26 @@
 /**
- * Note drill: shows one note at a time and grades what is played.
+ * Note drill: shows one note at a time and checks what is played.
  * Correct → success flash, next card. Wrong → error flash on the played key,
  * the correct key is shown, and the card waits until that key is played.
+ * Cards come from a DrillSource (review session or free practice), which
+ * also decides what an answer does.
  */
 import { audio } from '../../core/audio';
-import { autoGrade, recordReview, SessionQueue } from '../../core/scheduler';
-import type { NoteDrillOptions } from '../../core/settings';
-import { storage, type CardRecord } from '../../core/storage';
-import type { StaffKind } from '../../core/notation';
 import { cssTimeMs } from '../../ui/dom';
 import type { Keyboard } from '../../ui/keyboard';
 import type { StaffView } from '../../ui/staff';
+import { ReviewSource, type DrillItem, type DrillSource } from './sources';
 
 export interface DrillHooks {
-  /** A review was saved (refresh due counts). */
-  reviewed: () => void;
-  /** The queue is empty or the drill was stopped. */
+  /** The source ran out of cards. */
   finished: () => void;
 }
 
 type Phase = 'answering' | 'advancing' | 'paused' | 'stopped';
 
 export class NoteDrill {
-  private queue: SessionQueue = new SessionQueue([]);
-  private card: CardRecord | null = null;
+  private source: DrillSource = new ReviewSource([], 'treble', {}, () => undefined);
+  private card: DrillItem | null = null;
   private phase: Phase = 'stopped';
   private resumePhase: Phase = 'answering';
   private shownAt = 0;
@@ -33,10 +30,8 @@ export class NoteDrill {
   private graded = false;
   private hinted = false;
   private advanceTimer = 0;
-  private options: NoteDrillOptions | null = null;
-  /** The current card as it is now (updated once graded), and the cards shown before it. */
-  private latest: CardRecord | null = null;
-  private history: CardRecord[] = [];
+  /** Cards shown before the current one, for "previous". */
+  private history: DrillItem[] = [];
 
   constructor(
     private staff: StaffView,
@@ -52,9 +47,9 @@ export class NoteDrill {
     return this.phase === 'paused';
   }
 
-  start(cards: CardRecord[], options: NoteDrillOptions, { ahead = false } = {}): void {
-    this.options = options;
-    this.queue = new SessionQueue(cards, { ahead });
+  start(source: DrillSource): void {
+    this.stop();
+    this.source = source;
     this.phase = 'answering';
     this.card = null;
     this.history = [];
@@ -77,8 +72,9 @@ export class NoteDrill {
     const correct = note === target;
 
     if (!this.graded) {
+      this.graded = true;
       const responseMs = Math.max(0, time - this.shownAt - this.pausedTotal);
-      void this.grade(correct, responseMs);
+      void this.source.record(this.card, correct, responseMs, this.hinted);
     }
     if (correct) {
       this.keyboard.flash(note, 'correct');
@@ -120,7 +116,7 @@ export class NoteDrill {
   skip(): void {
     if (this.phase !== 'answering' || !this.card) return;
     // A failed card is already back in the queue; an unanswered one goes to the end.
-    if (!this.graded) this.queue.deferToEnd(this.card);
+    if (!this.graded) this.source.skip(this.card);
     this.keyboard.setTarget(null);
     this.showNext();
   }
@@ -133,7 +129,7 @@ export class NoteDrill {
     if (this.phase !== 'answering' || !this.card) return;
     const prev = this.history.pop();
     if (!prev) return;
-    if (!this.graded) this.queue.pushFront(this.card);
+    if (!this.graded) this.source.pushFront(this.card);
     this.keyboard.setTarget(null);
     this.showCard(prev, { practice: true });
   }
@@ -147,17 +143,6 @@ export class NoteDrill {
 
   // ── Internals ────────────────────────────────────────────────────────
 
-  private async grade(correct: boolean, responseMs: number): Promise<void> {
-    const card = this.card!;
-    this.graded = true;
-    const now = Date.now();
-    const result = recordReview(card, autoGrade(correct, responseMs, this.hinted), responseMs, now);
-    this.latest = result.card;
-    this.queue.requeue(result.card, now);
-    await storage.recordReview(result.review, result.card);
-    this.hooks.reviewed();
-  }
-
   private advance(): void {
     this.phase = 'advancing';
     this.advanceTimer = window.setTimeout(() => {
@@ -169,25 +154,24 @@ export class NoteDrill {
   }
 
   private showNext(): void {
-    const next = this.queue.next(Date.now());
+    const next = this.source.next(Date.now());
     if (!next) {
       this.stop();
       this.hooks.finished();
       return;
     }
-    if (this.latest) this.history.push(this.latest);
+    if (this.card) this.history.push(this.card);
     this.showCard(next, { practice: false });
   }
 
-  private showCard(card: CardRecord, { practice }: { practice: boolean }): void {
+  private showCard(card: DrillItem, { practice }: { practice: boolean }): void {
     this.card = card;
-    this.latest = card;
     this.phase = 'answering';
     this.graded = practice; // a practice showing is never graded
     this.hinted = false;
-    this.staff.show(this.staffKind(), [{ clef: card.content.clef, spellings: [card.content.spelling] }]);
+    this.staff.show(this.source.staff, [{ clef: card.content.clef, spellings: [card.content.spelling] }]);
     if (practice) this.staff.setState('idle', 'Practice — not graded');
-    this.staff.setCorner(`${this.queue.size + 1} left`);
+    this.staff.setCorner(this.source.corner());
     this.keyboard.setFocus(card.content.midi);
     this.resetTiming();
   }
@@ -195,10 +179,5 @@ export class NoteDrill {
   private resetTiming(): void {
     this.shownAt = performance.now();
     this.pausedTotal = 0;
-  }
-
-  private staffKind(): StaffKind {
-    const clef = this.options?.clef ?? 'treble';
-    return clef === 'both' ? 'grand' : clef;
   }
 }
