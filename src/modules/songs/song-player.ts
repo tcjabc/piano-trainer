@@ -314,9 +314,9 @@ export class SongPlayer extends Emitter<PlayerEvents> {
     }
   }
 
-  /** Notes sounding at the position, played by the app (for lighting keys). */
+  /** Notes the app has played that are still sounding at the position (for lighting keys). */
   appSounding(): SongNote[] {
-    return this.appNotes.filter((n) => n.beat <= this.pos && this.pos < n.beat + n.duration);
+    return this.appNotes.slice(0, this.appNext).filter((n) => n.beat <= this.pos + 1e-6 && this.pos < n.beat + n.duration);
   }
 
   // ── Input ────────────────────────────────────────────────────────────

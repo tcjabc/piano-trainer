@@ -25,7 +25,7 @@ import { Drill } from '../modules/drill/drill';
 import { itemContent, libraryItemFor, newSongCard, noteItem, songCardKey, type DrillItem, type DrillOptions } from '../modules/drill/items';
 import { theoryFor } from '../modules/library/theory';
 import { FreeSource, ReviewSource } from '../modules/drill/sources';
-import { HAND_LABELS } from '../modules/drill/tasks';
+import { baseTasks, HAND_LABELS } from '../modules/drill/tasks';
 import { freeContents, freeRange, staffForHand } from '../modules/notes/free';
 import { FreePracticeView } from '../modules/notes/free-view';
 import { filterItems, STARTER_DECKS, type ItemKind, type LibraryItem } from '../modules/library/catalog';
@@ -34,6 +34,7 @@ import { LibraryView } from '../modules/library/library-view';
 import { relativeDue, ReviewIndex } from '../modules/library/review-index';
 import { PlayView } from '../modules/play/play-view';
 import { PlayerView } from '../modules/songs/player-view';
+import { SongTask } from '../modules/songs/song-task';
 import { addBundledSongs, loadSong } from '../modules/songs/song-store';
 import { SongsView } from '../modules/songs/songs-view';
 import { Visualiser } from '../modules/play/visualiser';
@@ -115,6 +116,8 @@ export class App {
   private libraryNav = new LibraryNav((tab) => this.showLibraryTab(tab));
   private songs = new SongsView({ open: (id) => void this.openSong(id) });
   private player: PlayerView;
+  /** Plays song sections that come up in a Study session. */
+  private reviewPlayer: PlayerView;
   private songSaveTimer = 0;
   private librarySaveTimer = 0;
   private free: FreePracticeView;
@@ -131,6 +134,7 @@ export class App {
     this.drill = new Drill(this.staff, this.keyboard, {
       finished: () => this.show(this.drillReturn),
       answered: (item) => this.theoryReminder(item),
+      stage: (el) => this.drillStage(el),
     });
     this.library = new LibraryView(
       settings.library,
@@ -162,6 +166,15 @@ export class App {
       reviewState: (songId, sectionId) => this.songReviewState(songId, sectionId),
       toggleReview: (songId, sectionId) => this.toggleSongReview(songId, sectionId),
     });
+    this.reviewPlayer = new PlayerView(this.keyboard, {
+      back: () => undefined,
+      settingsChanged: () => undefined,
+      setHand: () => undefined,
+      reviewState: (songId, sectionId) => this.songReviewState(songId, sectionId),
+      toggleReview: (songId, sectionId) => this.toggleSongReview(songId, sectionId),
+    });
+    const songTask = { player: this.reviewPlayer, settings: () => this.settings.songs, preset: () => this.settings.visualiser.colors };
+    this.drill.tasks = (item, host, noteStaff) => (item.module === 'songs' ? new SongTask(item.content, host, songTask) : baseTasks(item, host, noteStaff));
     this.free = new FreePracticeView(settings.freePractice, {
       change: (freePractice) => void this.patchSettings({ freePractice }),
       start: () => this.startFree(),
@@ -239,6 +252,14 @@ export class App {
     const s = this.settings;
     this.player.open(entry, s.songs, s.hand, s.visualiser.colors);
     this.show('song');
+  }
+
+  /** A song section in a Study session takes the stage, laid out so its notes fall onto the keys. */
+  private drillStage(el: HTMLElement | null): void {
+    const app = this.root.querySelector('.app');
+    app?.toggleAttribute('data-song-stage', el !== null);
+    if (el) this.stage.replaceChildren(el);
+    else if (this.screen === 'drill') this.stage.replaceChildren(this.staff.el);
   }
 
   /** Song player settings change often (tempo slider, progressive tempo); save them once they settle. */

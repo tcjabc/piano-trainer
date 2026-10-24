@@ -7,7 +7,7 @@
  * - FreeSource: free practice. Cards from a chosen set, at random, with no
  *   end. Answers are logged as attempts and never touch the schedule.
  */
-import { GRADING, gradeScale, gradeTimed, scalePassed } from '../../core/grading';
+import { GRADING, gradeScale, gradeSongPass, gradeTimed, scalePassed, type SongPassResult } from '../../core/grading';
 import type { StaffKind } from '../../core/notation';
 import { recordReview, SessionQueue } from '../../core/scheduler';
 import { storage, uuid, type AttemptRecord, type CardRecord } from '../../core/storage';
@@ -23,10 +23,13 @@ export interface Outcome {
   errors?: number;
   /** Scales: notes in the scale as played. */
   notes?: number;
+  /** Song sections: how the pass went. */
+  song?: SongPassResult;
 }
 
 export function gradeOutcome(module: DrillItem['module'], o: Outcome, hinted: boolean): Grade {
   if (module === 'scales') return gradeScale(o.errors ?? 0, o.ms, o.notes ?? 1, hinted);
+  if (module === 'songs') return gradeSongPass(o.song ?? { mode: 'wait', accuracy: o.correct ? 1 : 0, onTime: null });
   return gradeTimed(o.correct, o.ms, hinted, module === 'chords' ? GRADING.chords : GRADING.notes);
 }
 

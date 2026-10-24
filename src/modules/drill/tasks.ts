@@ -28,6 +28,8 @@ export interface TaskHost {
   outcome(o: Outcome): void;
   /** Done: success flash, then the next card. */
   complete(): void;
+  /** Show this element in place of the staff panel (null puts the staff back). */
+  stage(el: HTMLElement | null): void;
 }
 
 export interface Task {
@@ -38,6 +40,10 @@ export interface Task {
   restart(): void;
   /** H: play the answer. */
   hint(): void;
+  /** The drill was paused or resumed. */
+  pause?(paused: boolean): void;
+  /** The card is leaving the screen (next card, or the drill stopped). */
+  leave?(): void;
 }
 
 export type TaskFactory = (item: DrillItem, host: TaskHost, noteStaff: StaffKind) => Task | null;

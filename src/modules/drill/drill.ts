@@ -14,6 +14,8 @@ import { baseTasks, type Task, type TaskFactory, type TaskHost } from './tasks';
 export interface DrillHooks {
   /** The source ran out of cards. */
   finished: () => void;
+  /** Show an element in place of the staff panel (a song section), or null for the staff. */
+  stage?: (el: HTMLElement | null) => void;
   /** A card was answered (played correctly, or a scale finished). */
   answered?: (item: DrillItem) => void;
 }
@@ -67,7 +69,9 @@ export class Drill {
     window.clearTimeout(this.advanceTimer);
     this.phase = 'stopped';
     this.item = null;
+    this.task?.leave?.();
     this.task = null;
+    this.hooks.stage?.(null);
     this.keyboard.setTargets([]);
     this.keyboard.setFocus(null);
     this.keyboard.clearFingers();
@@ -92,6 +96,7 @@ export class Drill {
       this.pausedTotal += performance.now() - this.pausedAt;
       this.phase = this.resumePhase;
       this.staff.setState('idle');
+      this.task?.pause?.(false);
       if (this.phase === 'advancing') this.showNext();
     } else if (this.phase === 'answering' || this.phase === 'advancing') {
       window.clearTimeout(this.advanceTimer);
@@ -99,6 +104,7 @@ export class Drill {
       this.pausedAt = performance.now();
       this.phase = 'paused';
       this.staff.setState('paused', 'Paused — press Space to continue');
+      this.task?.pause?.(true);
     }
   }
 
@@ -163,6 +169,7 @@ export class Drill {
       if (self.item) self.hooks.answered?.(self.item);
       self.advance();
     },
+    stage: (el) => self.hooks.stage?.(el),
   }))(this);
 
   private advance(): void {
@@ -193,6 +200,8 @@ export class Drill {
     this.hinted = false;
     this.keyboard.setTargets([]);
     this.keyboard.clearFingers();
+    this.task?.leave?.();
+    this.hooks.stage?.(null);
     this.task = this.tasks(item, this.host, this.source.noteStaff);
     if (!this.task) {
       // A kind of card this drill can't show yet: skip it.

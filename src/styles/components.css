@@ -1896,16 +1896,22 @@ select.control {
  * Hints move above the stage so the falling notes can land right on the
  * keys (as with the Play visualiser).
  */
-.app[data-screen='song'] {
+.app[data-screen='song'],
+.app[data-song-stage] {
   grid-template-rows: var(--header-height) var(--toolbar-height) minmax(0, 1fr) 0 var(--keyboard-height);
 }
 
-.app[data-screen='song'] > .app-header { grid-row: 1; }
-.app[data-screen='song'] > .keyboard-toolbar { grid-row: 2; }
-.app[data-screen='song'] > .visualiser { grid-row: 4; }
-.app[data-screen='song'] > .keyboard-dock { grid-row: 5; }
+.app[data-screen='song'] > .app-header,
+.app[data-song-stage] > .app-header { grid-row: 1; }
+.app[data-screen='song'] > .keyboard-toolbar,
+.app[data-song-stage] > .keyboard-toolbar { grid-row: 2; }
+.app[data-screen='song'] > .visualiser,
+.app[data-song-stage] > .visualiser { grid-row: 4; }
+.app[data-screen='song'] > .keyboard-dock,
+.app[data-song-stage] > .keyboard-dock { grid-row: 5; }
 
-.app[data-screen='song'] > .stage {
+.app[data-screen='song'] > .stage,
+.app[data-song-stage] > .stage {
   grid-row: 3;
   place-items: stretch;
   padding: 0;

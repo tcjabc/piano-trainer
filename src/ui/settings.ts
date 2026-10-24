@@ -221,6 +221,10 @@ export class SettingsView {
           form.numberInput(s.scaleDrill.newPerDay, 0, 30, (v) => this.commit((x) => (x.scaleDrill.newPerDay = v))),
         ),
         form.field(
+          'New song sections per day',
+          form.numberInput(s.songs.newPerDay, 0, 20, (v) => this.commit((x) => (x.songs.newPerDay = v))),
+        ),
+        form.field(
           'Theory reminders',
           form.checkbox(
             s.theoryReminders,
