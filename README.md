@@ -6,7 +6,7 @@ The app has three areas, switched with the header tabs or **P** / **T** / **L**:
 
 - **Play** (opens on launch): free playing. A live grand staff shows what you're holding (chords stacked), with the note names and, for three or more notes, the chord name (via tonal). Optional visualiser (V). Nothing is scored or recorded.
 - **Study**: notes, chords and scales with spaced repetition (FSRS). A card appears, you play it, and FSRS decides when you see it again. There's also free practice. The header's due count is visible from every area.
-- **Library** (**L**): every chord and scale. Browse, search, hear it and play along, see its fingering, add it to review, and build decks.
+- **Library** (**L**): every chord and scale (browse, search, hear it and play along, see its fingering, add it to review, build decks), and **Songs**: import MIDI or MusicXML and learn them section by section with falling notes or the score.
 
 ## Setup
 
@@ -26,7 +26,7 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | `npm run dev` | Vite dev server with hot reload |
 | `npm run build` | Typecheck, then build the production app into `dist/` (with service worker) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | Unit tests (Vitest): theory notes and templating, metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
+| `npm test` | Unit tests (Vitest): song import (MIDI, MusicXML), hand splitting, sections, wait-mode matching, timing judgement, learning path, theory notes and templating, metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
 | `npm run typecheck` | TypeScript only |
 
 ## Using it
@@ -142,6 +142,59 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings). Import merges by record, and the newer change wins.
 
+### Songs (Library → Songs, **G**)
+
+**Import** a song with **Import song** (**I**) or by dropping files on the list:
+- **Formats:** `.mid`/`.midi` (read with @tonejs/midi), and MusicXML as `.musicxml`/`.xml` or compressed `.mxl`.
+- **Storage:** songs live in IndexedDB.
+- **MusicXML hands:** a two-staff piano part is split by staff (right hand on top). Separate parts go by their clef.
+- **MusicXML details:** fingering, ties, chords, tempo marks, rehearsal marks and double bars are read. Repeats are played straight through.
+- **MIDI hands:** when a file has exactly two tracks with notes, the lower track is the left hand. Otherwise you choose a split key (middle C by default) with a preview, a piano roll coloured by hand.
+- **Bundled songs:** three public-domain pieces, arranged here for two hands with fingering on every note: *Twinkle, Twinkle, Little Star*, *Ode to Joy* (Beethoven) and *Minuet in G* (Christian Petzold). Their scores are in `src/data/songs/`.
+
+**The list** shows title and artist (both renamable), length, key, tempo, and progress per section (one pip per section, filling along the learning path). You can delete a song, which also deletes its progress and review cards.
+
+**The player** (click a song):
+- **Views (V, remembered):**
+  - *Falling notes*: notes fall onto their keys, drawn like the Play visualiser, which shares its renderer and colour presets. They're coloured by finger where fingering is known, by hand, or with the visualiser's colours, with finger numbers and optional note names.
+  - *Notation*: the score with a cursor that follows the song, drawn by OpenSheetMusicDisplay. It's MusicXML only and loads on first use.
+- **The keyboard** always shows the next keys to play, with finger numbers where known.
+- **Modes:**
+  - **Wait** (the default for learning): the song stops at each step until you play its notes; a chord's notes can come in any order. Wrong notes flash and are counted, nothing more.
+  - **Play-along**: the song runs at tempo with the metronome, after a bar of count-in. Each note is marked on time, early, late or missed. The windows (±100 ms on time, ±250 ms a hit) are in `src/core/grading.ts`.
+  - **Listen**: the app plays the chosen hands.
+- **Hands:** the hand legend (1 2 3) picks the hands you play. The other hand is played by the app, muted, or hidden (Options).
+- **Tempo:** 25–150% (, and . change it by 5%; a learned tempo knob works too).
+  - **+5% after a clean pass** raises the tempo after each clean pass of the loop, up to 100%.
+- **Loops:** the current section loops. You can also set loop points with **[** (A) and **]** (B), at the current bar's beat; **\\** clears them.
+
+**Sections and the learning path:**
+- **Automatic sections:** songs are split at rehearsal marks, at double bars and repeats, or else into four-bar sections (eight-bar sections for songs over 64 bars). A pickup bar joins the first section.
+- **Editing sections:** rename, split at the current bar, or merge with the next.
+- **The path:** each section follows right hand slow → left hand slow → hands together slow, all in wait mode at 60%, then up to tempo in play-along, 5% faster after each clean pass until a clean pass at 100%.
+  - A slow step is done after two clean passes in a row.
+  - Clean means 95%+ of notes right, and in play-along also 90%+ on time.
+  - Any pass that is at least as demanding as the step counts (same hands, the same mode or play-along, at least as fast).
+  - **Practise this step** sets it all up.
+- **Stats** per section: last and best accuracy, best tempo of a clean pass, passes and last practised.
+- **Review:** **Add to review** makes the section a card in Today, with its own daily limit (Settings, default 2).
+  - In a session it plays once at the step it has reached, and the pass counts towards its path.
+  - Grades: under 80% right is Again; a pass that isn't clean is Hard; a clean pass is Good, or Easy when perfect (wait mode) or 95%+ on time (play-along).
+
+**Fingering:** taken from the MusicXML where present. Click a falling note while stopped to set or clear its finger (1–5). It's saved with the song and written into its score, so the notation shows it too. Nothing is generated automatically.
+
+| Key | Action |
+| --- | --- |
+| Space | Play / pause |
+| R | Restart the section (or loop) |
+| ← / → | Previous / next section |
+| [ / ] / \\ | Loop start (A) / end (B) / clear |
+| , / . | Tempo −5% / +5% |
+| W | Wait mode ↔ play-along |
+| V | Falling notes ↔ notation |
+| 1 / 2 / 3 | Left / right / both hands |
+| Esc | Back to the song list |
+
 ### Metronome
 
 The metronome pill in the header works on every screen: start/stop, the tempo, and beat dots that light in time (the first beat's dot is larger). Click the tempo for a small popover with every option; Esc or a click outside closes it.
@@ -187,13 +240,13 @@ Measured in Chrome over 30 s at 120 BPM, by detecting each click's onset in the 
 - **Ports:** the app listens on every MIDI port of the connected device, including the KeyLab's DAW port ("MIDIIN2 …") where the transport buttons send Mackie Control notes. Only the keys port plays notes. Messages from other ports never make a sound.
 - **What can be learned:** note-on pads, CC buttons (value above 63 is a press; only the press triggers), Mackie transport buttons, and HUI buttons (zone + port). Piano keys can't be learned. That means notes from the keys port within the keyboard's range, except on channel 10 where pads usually send. The sustain pedal can't be learned either.
 - **Mapped controls only run actions:** they never also play a note or count as a drill answer.
-- **Actions:** Play area, Study area, Library, Start/pause, Restart card, Skip/next, Previous, Hear answer, Toggle visualiser, Toggle fingering, Left/Right/Both hands, Zoom in/out, Settings, Back, Metronome start/stop, Tap tempo and Tempo +1/−1. A mapped control does what the matching key does on the current screen; where that key does nothing, so does the control.
-- **Knobs:** *Keyboard zoom (knob)* and *Tempo (knob)* take a knob. The encoding (absolute, or one of three relative styles) is guessed from the first few values while you turn it. You can change it in the row if the guess is wrong. An absolute tempo knob spans 30–240 BPM; a relative one moves 1 BPM per step.
+- **Actions:** Play area, Study area, Library, Start/pause, Restart card, Skip/next, Previous, Hear answer, Toggle visualiser, Toggle fingering, Left/Right/Both hands, Zoom in/out, Settings, Back, Metronome start/stop, Tap tempo and Tempo +1/−1, and in songs Loop A/B, Falling notes/notation and Wait/play-along. A mapped control does what the matching key does on the current screen; where that key does nothing, so does the control.
+- **Knobs:** *Keyboard zoom (knob)* and *Tempo (knob)* take a knob (in a song, the tempo knob sets the song's tempo: an absolute knob spans 25–150%, a relative one moves 5% per step). The encoding (absolute, or one of three relative styles) is guessed from the first few values while you turn it. You can change it in the row if the guess is wrong. An absolute tempo knob spans 30–240 BPM; a relative one moves 1 BPM per step.
 - **Saving:** mappings are stored in settings and included in the JSON export. When there's room, the hint bar shows the mapped control next to each key. The hint bar never clips: when space is short it drops the mapped controls, then the less important hints, then the descriptions (keys only, with the description as a tooltip).
 
 ## Offline and updates
 
-The service worker precaches the hashed JS and CSS (which includes VexFlow's music font), the Chillax variable font, the icon and the manifest: 6 entries, about 940 KiB. Source maps aren't built.
+The service worker precaches the hashed JS and CSS (which includes VexFlow's music font), the Chillax variable font, the icon and the manifest: 7 entries, about 2.5 MiB (OpenSheetMusicDisplay, for song scores, is its own chunk of about 1.3 MiB and is only loaded when a score is first shown). Source maps aren't built.
 
 - **The page:** `index.html` is fetched network-first with a 3-second timeout and falls back to the cached copy offline, so a new deploy is picked up as soon as you're online.
 - **Piano samples:** smplr's Splendid Grand Piano, from `smpldsnds.github.io`. They live in their own cache-first cache (`piano-samples`), filled as they load. App updates never clear it, so after one online session the app works fully offline.
@@ -236,18 +289,26 @@ src/
     fingering.ts   finger colours 1–5 and hand markers
     pitch.ts       note names, MIDI numbers, ledger lines
     settings.ts    settings shape and defaults
+    song.ts        songs in beats with a tempo map, steps, measures, keys
+    song-midi.ts   MIDI import and hand splitting
+    song-musicxml.ts MusicXML/.mxl import; writing fingering back into the score
+    song-sections.ts automatic sections, split and merge
+    song-judge.ts  wait-mode step matching, play-along timing judgement
+    song-learning.ts learning path and progressive tempo
   data/theory.ts theory notes for each chord quality and scale type (hand-editable)
+  data/songs/    the bundled public-domain songs (MusicXML)
   modules/notes/ note cards, today's plan, free practice selection
   modules/drill/ the drill (one card at a time), tasks for notes/chords/scales, chord/scale checking, sources
   modules/library/ catalog and search, Library view, decks, review status, theory templating and compare
-  modules/play/  Play area: live staff and chord readout, chord detection, visualiser
+  modules/play/  Play area: live staff and chord readout, chord detection, visualiser (and the glow renderer it shares)
+  modules/songs/ Songs tab, import, the player (engine, falling notes, notation) and song review cards
   ui/            header (with the metronome pill), keyboard, hand legend, staff panel, Today, settings, hotkeys, app shell
   assets/        hand-right.svg (modified Vadivam "hand" icon)
   styles/        tokens.css (all design tokens), base.css, components.css
 build/vadivam.ts Vite plugin that inlines the Vadivam icons listed in src/ui/icon-list.ts
 ```
 
-Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later. Stores: `cards`, `reviews` (FSRS reviews), `settings`, `attempts` (free practice; added in database version 2) and `decks` (version 3). Each upgrade only creates what an older database is missing.
+Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later. Stores: `cards`, `reviews` (FSRS reviews), `settings`, `attempts` (free practice; added in database version 2), `decks` (version 3), and `songs` and `songProgress` (version 4). Each upgrade only creates what an older database is missing.
 
 ## Design
 
