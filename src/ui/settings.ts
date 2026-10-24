@@ -216,6 +216,22 @@ export class SettingsView {
             'Show the chord on the staff as well as its name',
           ),
         ),
+        form.field(
+          'New scales per day',
+          form.numberInput(s.scaleDrill.newPerDay, 0, 30, (v) => this.commit((x) => (x.scaleDrill.newPerDay = v))),
+        ),
+        form.field(
+          'Scale cards',
+          form.segmented<'up' | 'updown'>(
+            'scale-direction',
+            [
+              { value: 'up', label: 'Ascending' },
+              { value: 'updown', label: 'Up and down' },
+            ],
+            s.scaleDrill.direction,
+            (v) => this.commit((x) => (x.scaleDrill.direction = v)),
+          ),
+        ),
         h(
           'p.muted.field-note',
           null,

@@ -4,15 +4,17 @@
  */
 import { audio } from '../../core/audio';
 import { chordName, chordNotes, chordSymbol, pitchClass } from '../../core/chords';
+import { scalePassed } from '../../core/grading';
+import { scaleName, scaleSequence } from '../../core/scales';
 import type { StaffKind } from '../../core/notation';
 import { midiToName } from '../../core/pitch';
 import type { HandChoice } from '../../core/settings';
-import type { ChordCardContent, NoteCardContent } from '../../core/storage';
+import type { ChordCardContent, NoteCardContent, ScaleCardContent } from '../../core/storage';
 import type { Keyboard } from '../../ui/keyboard';
 import type { StaffView } from '../../ui/staff';
-import type { ChordItem } from '../library/catalog';
-import { chordTarget, fingers, notation, voicings } from '../library/voicing';
-import { checkChord, type ChordCheck } from './check';
+import type { ChordItem, ScaleItem } from '../library/catalog';
+import { chordTarget, fingers, notation, scaleReference, voicings } from '../library/voicing';
+import { checkChord, ScaleTracker, type ChordCheck } from './check';
 import { libraryItemFor, type DrillItem, type DrillOptions } from './items';
 import type { Outcome } from './sources';
 
@@ -186,9 +188,104 @@ export class ChordTask implements Task {
   }
 }
 
-/** Note and chord tasks (scales are added by their own module). */
+// ── Scales ─────────────────────────────────────────────────────────────
+
+/**
+ * A scale by name, played in order (ascending, or up and down — a setting)
+ * in any octave. A wrong note is marked and counted, and the scale carries
+ * on from the note that was expected. Graded when finished, on wrong notes
+ * and total time. Fingering is shown on the keys (unless switched off).
+ */
+export class ScaleTask implements Task {
+  private item: ScaleItem;
+  private tracker: ScaleTracker;
+
+  constructor(
+    private c: ScaleCardContent,
+    private host: TaskHost,
+  ) {
+    this.item = libraryItemFor({ id: '', module: 'scales', content: c }) as ScaleItem;
+    this.tracker = this.newTracker();
+  }
+
+  private get direction() {
+    return this.host.options.scaleDirection;
+  }
+
+  private newTracker(): ScaleTracker {
+    return new ScaleTracker(scaleReference(this.item, this.c.octaves, this.direction), this.c.hand === 'both');
+  }
+
+  /** Spelled name (no octave) of the note at a step, for messages. */
+  private noteName(index: number): string {
+    const seq = scaleSequence({ tonic: this.c.tonic, type: this.c.type, octaves: this.c.octaves }, 'R', this.direction);
+    return seq[index]?.spelling.replace(/-?\d+$/, '') ?? '';
+  }
+
+  private progress(): string {
+    return `${this.tracker.index} / ${this.tracker.length}`;
+  }
+
+  show(): void {
+    const { staff, keyboard, options } = this.host;
+    const octaves = this.c.octaves === 1 ? '1 octave' : '2 octaves';
+    const way = this.direction === 'up' ? 'ascending' : 'up and down';
+    staff.showPrompt(scaleName(this.c), `${octaves} · ${way} · ${HAND_LABELS[this.c.hand]}`);
+    staff.setState('idle', this.progress());
+    const v = voicings(this.item, this.c.hand, this.c.octaves);
+    if (options.fingering) {
+      const f = fingers(this.item, this.c.hand, this.c.octaves);
+      for (const side of ['L', 'R'] as const) {
+        const list = f[side];
+        v[side]?.forEach((n, i) => {
+          const finger = list?.[i];
+          if (finger) keyboard.setFinger(n.midi, { finger: finger as 1 | 2 | 3 | 4 | 5, hand: side });
+        });
+      }
+    }
+    keyboard.setFocus((v.R ?? v.L)![0]!.midi);
+  }
+
+  noteOn(note: number, time: number): void {
+    const { keyboard, staff } = this.host;
+    const step = this.tracker.press(note, time);
+    if (step === 'wrong') {
+      keyboard.flash(note, 'wrong');
+      const next = this.tracker.nextKey();
+      keyboard.setTargets(next === null ? [] : [next]);
+      staff.setState('wrong', `Wrong note — next is ${this.noteName(this.tracker.index)} · ${this.progress()}`);
+    } else if (step === 'ok') {
+      keyboard.flash(note, 'correct', 200);
+      keyboard.setTargets([]);
+      staff.setState('idle', this.progress());
+    } else {
+      const errors = this.tracker.errors;
+      const passed = scalePassed(errors);
+      this.host.outcome({ correct: passed, ms: this.tracker.elapsedMs, errors, notes: this.tracker.length });
+      keyboard.setTargets([]);
+      staff.setState(passed ? 'correct' : 'wrong', errors === 0 ? '' : `${errors} wrong note${errors === 1 ? '' : 's'}`);
+      this.host.complete();
+    }
+  }
+
+  noteOff(): void {}
+
+  restart(): void {
+    this.tracker = this.newTracker();
+    this.host.keyboard.setTargets([]);
+    this.host.staff.setState('idle', this.progress());
+  }
+
+  hint(): void {
+    const seq = scaleReference(this.item, this.c.octaves, this.direction);
+    const shift = this.c.hand === 'left' ? -12 : 0;
+    audio.playNotes(seq.map((n) => n + shift), { stepMs: 200, seconds: 0.45 });
+    if (this.c.hand === 'both') audio.playNotes(seq.map((n) => n - 12), { stepMs: 200, seconds: 0.45 });
+  }
+}
+
 export const baseTasks: TaskFactory = (item, host, noteStaff) => {
   if (item.module === 'notes') return new NoteTask(item.content, host, noteStaff);
   if (item.module === 'chords') return new ChordTask(item.content, host);
-  return null;
+  return new ScaleTask(item.content, host);
 };

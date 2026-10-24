@@ -6,6 +6,7 @@
  * and scales are chosen with the same filters as the Library.
  */
 import { CHORD_QUALITIES, INVERSION_NAMES, type ChordQuality } from '../../core/chords';
+import { SCALE_TYPES, type ScaleType } from '../../core/scales';
 import type { LibraryFilter } from '../../core/filter';
 import { formatSpelling, midiToName, naturalsBetween, spellingToMidi, type Clef } from '../../core/pitch';
 import type { FreeNoteSettings, FreePracticeKind, FreePracticeSettings, HandChoice } from '../../core/settings';
@@ -16,8 +17,8 @@ import { formatNoteName } from '../../ui/note-text';
 import { ALL_ROOTS, filterItems, QUALITY_LABELS } from '../library/catalog';
 import { freeContents } from './free';
 
-/** Kinds free practice can drill (scales join once their drill exists). */
-export const FREE_KINDS: ReadonlySet<FreePracticeKind> = new Set(['notes', 'chords']);
+/** Kinds free practice can drill. */
+export const FREE_KINDS: ReadonlySet<FreePracticeKind> = new Set(['notes', 'chords', 'scales']);
 
 export interface FreePracticeActions {
   change: (settings: FreePracticeSettings) => void;
@@ -151,7 +152,7 @@ export class FreePracticeView {
     const f = this.form;
     const n = this.settings.notes;
     if (this.settings.kind === 'chords') return [this.chordSection()];
-    if (this.settings.kind === 'scales') return [];
+    if (this.settings.kind === 'scales') return [this.scaleSection()];
     return [
       f.section(
         'Notes',
@@ -178,6 +179,24 @@ export class FreePracticeView {
         ),
       ),
     ];
+  }
+
+  private scaleSection(): HTMLElement {
+    const sc = this.settings.scales;
+    const update = (patch: Partial<LibraryFilter>) => {
+      this.settings.scales = { ...sc, ...patch };
+      this.save();
+    };
+    return this.form.section(
+      'Scales',
+      h('p.muted.field-note', null, 'Leave a group empty for all of it. Play each scale in order in the hand above, in any octave.'),
+      chipGroup<ScaleType>('Type', SCALE_TYPES.map((s) => s.id), sc.scaleTypes, (t) => t, (t) => update({ scaleTypes: toggled(sc.scaleTypes, t) })),
+      chipGroup<string>('Tonic', ALL_ROOTS, sc.roots, (r) => formatNoteName(r), (r) => update({ roots: toggled(sc.roots, r) })),
+      chipGroup<number>('Octaves', [1, 2], [this.settings.octaves], (o) => `${o} octave${o === 2 ? 's' : ''}`, (o) => {
+        this.settings.octaves = o as 1 | 2;
+        this.save();
+      }),
+    );
   }
 
   private chordSection(): HTMLElement {

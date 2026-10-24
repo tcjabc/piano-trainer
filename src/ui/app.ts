@@ -46,8 +46,8 @@ import { ZoomControl } from './zoom-control';
 
 type Screen = 'play' | 'today' | 'free' | 'drill' | 'library' | 'settings';
 
-/** Library items that can be added to review and drilled (scales join with their drill). */
-const REVIEWABLE: ReadonlySet<ItemKind> = new Set(['chord']);
+/** Library items that can be added to review and drilled. */
+const REVIEWABLE: ReadonlySet<ItemKind> = new Set(['chord', 'scale']);
 
 const SUSTAIN_CC = 64;
 /** MIDI channel 10 (drum channel), where controller pads usually send. */
