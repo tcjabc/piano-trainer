@@ -5,13 +5,17 @@
  * hand, by finger (where fingering is known) or by the visualiser preset;
  * the hand you aren't playing is dimmed or hidden. Bar lines, finger numbers,
  * optional note names and how each note was played are drawn too.
+ *
+ * The hands differ by shape in every colour mode: the right hand's pills
+ * are solid, the left hand's hollow (an outline in the note's colour round
+ * a dark centre), so they stay apart even when both are coloured by finger.
  */
 import type { SongColors, VisualiserColors } from '../../core/settings';
 import type { SongNote } from '../../core/song';
 import { midiToName } from '../../core/pitch';
 import { h } from '../../ui/dom';
 import type { Keyboard } from '../../ui/keyboard';
-import { drawPill, presetColor, readVisualiserTokens, renderSprites, rgba, type Sprites, type Tokens } from '../play/glow';
+import { drawHollowPill, drawPill, presetColor, readVisualiserTokens, renderSprites, rgba, type Sprites, type Tokens } from '../play/glow';
 import type { SongPlayer } from './song-player';
 
 export interface FallingStyle {
@@ -23,9 +27,9 @@ export interface FallingStyle {
 /** Beats from the keyboard edge to the top of the view. */
 const VISIBLE_BEATS = 8;
 /** How much of a hand-coloured note's core keeps its colour (the visualiser's is mostly white). */
-const HAND_CORE_TINT = 0.75;
+const HAND_CORE_TINT = 0.95;
 /** How bright a note with a suggested finger is, next to one fingered in the score or by you. */
-const SUGGESTED_ALPHA = 0.6;
+const SUGGESTED_ALPHA = 0.8;
 /** How long a judgement label stays under the note (ms). */
 const LABEL_MS = 700;
 
@@ -43,7 +47,7 @@ export class FallingNotes {
   private ctx: CanvasRenderingContext2D;
   private tokens: Tokens;
   private sprites = new Map<string, Sprites>();
-  private colorsCss = { left: '', right: '', text: '', muted: '', fingers: [] as string[], good: '', bad: '' };
+  private colorsCss = { left: '', right: '', text: '', muted: '', bg: '', fingers: [] as string[], good: '', bad: '' };
   private dpr = 1;
   private hits: Hit[] = [];
 
@@ -65,6 +69,7 @@ export class FallingNotes {
       right: get('--stage-hand-right'),
       text: get('--stage-text') || '#f1f2f3',
       muted: get('--stage-text-muted') || '#888',
+      bg: get('--stage-bg') || '#050608',
       fingers: [1, 2, 3, 4, 5].map((f) => get(`--finger-${f}`)),
       good: get('--color-correct'),
       bad: get('--color-wrong'),
@@ -164,7 +169,9 @@ export class FallingNotes {
       if (mark?.kind === 'missed') alpha *= 0.35;
       if (n.suggested && style.colors === 'finger') alpha *= SUGGESTED_ALPHA;
       ctx.globalAlpha = alpha;
-      drawPill(ctx, this.tokens, this.spritesFor(this.colorFor(n, style), this.byHand(n, style)), x, Math.min(top, bottom - w), bottom, w);
+      const sprites = this.spritesFor(this.colorFor(n, style), this.byHand(n, style));
+      if (n.hand === 'L') drawHollowPill(ctx, this.tokens, sprites, x, Math.min(top, bottom - w), bottom, w, this.colorsCss.bg);
+      else drawPill(ctx, this.tokens, sprites, x, Math.min(top, bottom - w), bottom, w);
       this.hits.push({ note: n, x, top: Math.min(top, bottom - w), bottom, w });
     }
 
@@ -179,7 +186,8 @@ export class FallingNotes {
       if (hit.bottom <= 0 || room < 14 * dpr || hit.w < 10 * dpr) continue;
       const size = Math.min(13 * dpr, hit.w * 0.9);
       ctx.font = `700 ${size}px Chillax, sans-serif`;
-      ctx.fillStyle = '#111';
+      // Dark on a solid (right-hand) pill; light inside a hollow (left-hand) one.
+      ctx.fillStyle = n.hand === 'L' ? this.colorsCss.text : '#111';
       let y = hit.bottom - 3 * dpr;
       if (n.finger) {
         // A suggested finger: in italics, so it reads as a suggestion.

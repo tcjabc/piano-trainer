@@ -156,9 +156,9 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **The player** (click a song):
 - **Views (V, remembered):**
-  - *Falling notes*: notes fall onto their keys, drawn like the Play visualiser, which shares its renderer and colour presets. They're coloured by finger where fingering is known, by hand, or with the visualiser's colours, with finger numbers and optional note names.
+  - *Falling notes*: notes fall onto their keys, drawn like the Play visualiser, which shares its renderer and colour presets. They're coloured by finger where fingering is known, by hand, or with the visualiser's colours, with finger numbers and optional note names. The hands differ by shape in every colour mode: right-hand notes are solid, left-hand notes hollow (an outline round a dark centre). A small legend in the player shows this ("● right ○ left").
   - *Notation*: the score with a cursor that follows the song, drawn by OpenSheetMusicDisplay. It's MusicXML only and loads on first use.
-- **The keyboard** always shows the next keys to play, with finger numbers where known.
+- **The keyboard** always shows the next keys to play, with finger numbers where known: a filled marker for the right hand, an outlined one for the left.
 - **Modes:**
   - **Wait** (the default for learning): the song stops at each step until you play its notes; a chord's notes can come in any order. Wrong notes flash and are counted, nothing more. The pass ends as soon as the last note is played.
   - **Play-along**: the song runs at tempo with the metronome, after a bar of count-in. Each note is marked on time, early, late or missed. The windows (±100 ms on time, ±250 ms a hit) are in `src/core/grading.ts`.
@@ -184,7 +184,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **Fingering:** taken from the MusicXML where present (from `<notations><technical><fingering>`, as MuseScore, Finale, Sibelius and Dorico write it). Click a falling note while stopped to set or clear its finger (1–5). It's saved with the song and written into its score, so the notation shows it too.
 
-- **Without fingering**, notes are coloured by hand in neutral greys (cool slate left, warm cream right) that can't be mistaken for a finger colour, and the player says so.
+- **Without fingering**, notes are coloured by hand, a muted cool blue-grey (left) and warm amber-grey (right), kept clear of the finger colours and of green/red feedback. The player says so.
 - **Automatic fingering** (`src/core/autofinger.ts`): when a song is imported, notes without a finger get a suggested one. This is on by default; turn it off with the checkbox in the Songs tab.
   - The player's Options can **Suggest fingering** for an existing song, or **Clear suggested fingering**.
   - Fingering from the file, and fingers you set, are never changed. Setting a suggested finger makes it yours.

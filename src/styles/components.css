@@ -2189,3 +2189,66 @@ select.control {
 .songs-auto-finger {
   font-size: var(--text-caption);
 }
+
+/*
+ * The next keys in a song: a marker above the finger badge, filled for the
+ * right hand and outlined for the left, matching the falling notes.
+ */
+.key.is-upcoming-l::after,
+.key.is-upcoming-r::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--spacing-20) + var(--spacing-5) + var(--finger-badge-size) + var(--spacing-5));
+  width: var(--upcoming-marker-width);
+  height: var(--upcoming-marker-height);
+  transform: translateX(-50%);
+  border-radius: var(--upcoming-marker-height);
+  box-sizing: border-box;
+}
+
+.key-black.is-upcoming-l::after,
+.key-black.is-upcoming-r::after {
+  bottom: calc(var(--spacing-8) + var(--finger-badge-size) + var(--spacing-5));
+}
+
+.key.is-upcoming-r::after {
+  background: var(--color-hand-right);
+}
+
+.key.is-upcoming-l::after {
+  border: var(--upcoming-marker-line) solid var(--color-hand-left);
+}
+
+.key-black.is-upcoming-r::after {
+  background: var(--stage-hand-right);
+}
+
+.key-black.is-upcoming-l::after {
+  border-color: var(--stage-hand-left);
+}
+
+/* The legend: ● right  ○ left. */
+.hand-shapes {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.hand-shape {
+  width: var(--spacing-10);
+  height: var(--spacing-10);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.hand-shape.is-right {
+  background: var(--color-text);
+}
+
+.hand-shape.is-left {
+  border: var(--upcoming-marker-line) solid var(--color-text);
+  margin-left: var(--spacing-5);
+}

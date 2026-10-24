@@ -65,10 +65,10 @@
   --color-compare-soft: #e6efc4;
   /*
    * Hands in songs (split preview; falling notes use the --stage-hand-* ones).
-   * Neutral greys, cool and warm, so they never look like a finger colour.
+   * Muted blue-grey and amber-grey; the hands also differ by shape (left outlined).
    */
-  --color-hand-left: #56657a;
-  --color-hand-right: #7d7466;
+  --color-hand-left: #56719a;
+  --color-hand-right: #8c7650;
   /* Printed music (the song score) is dark on paper in both themes. */
   --color-paper: #ffffff;
   --color-paper-ink: #111111;
@@ -89,9 +89,13 @@
   /* ── Play stage (visualiser) — always dark, in both themes ────────── */
   --stage-bg: #050608;
   --stage-text: #f1f2f3;
-  /* Falling notes without fingering, by hand: neutral slate (left) and warm grey (right), unlike any finger colour. */
-  --stage-hand-left: #6f8099;
-  --stage-hand-right: #e6dcc6;
+  /*
+   * Falling notes without fingering, by hand: a cool blue-grey (left) and a
+   * warm amber-grey (right). Muted enough to stay clear of the finger colours
+   * and of green/red feedback; the hands also differ by shape (left hollow).
+   */
+  --stage-hand-left: #7f9bc4;
+  --stage-hand-right: #c9a675;
   --stage-text-muted: #8f8f8f;
   --stage-border: rgba(241, 242, 243, 0.14);
   --stage-overlay-bg: rgba(18, 19, 22, 0.62);
@@ -222,6 +226,10 @@
   --song-options-width: 340px;
   /* Suggested (automatic) fingering is drawn this much fainter. */
   --suggested-opacity: 0.7;
+  /* Upcoming-key markers in songs (filled: right hand, outlined: left). */
+  --upcoming-marker-width: 56%;
+  --upcoming-marker-height: 9px;
+  --upcoming-marker-line: 2px;
   --metronome-pill-height: 28px;
   --metronome-dot-size: 6px;
   --metronome-dot-size-first: 8px;
@@ -278,8 +286,8 @@
     --color-wrong-soft: #45201a;
     --color-compare: #c5e352;
     --color-compare-soft: #2f3a10;
-    --color-hand-left: #8d9bb0;
-    --color-hand-right: #d8d2c4;
+    --color-hand-left: #7f9bc4;
+    --color-hand-right: #c9a675;
     --color-on-functional: var(--neutral-carbon-black);
 
     --finger-1: #e8ad3a;
@@ -321,8 +329,8 @@
   --color-wrong-soft: #45201a;
   --color-compare: #c5e352;
   --color-compare-soft: #2f3a10;
-  --color-hand-left: #8d9bb0;
-  --color-hand-right: #d8d2c4;
+  --color-hand-left: #7f9bc4;
+  --color-hand-right: #c9a675;
   --color-on-functional: var(--neutral-carbon-black);
 
   --finger-1: #e8ad3a;

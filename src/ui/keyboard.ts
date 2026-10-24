@@ -201,6 +201,15 @@ export class Keyboard extends Emitter<KeyboardEvents> {
     this.setTargets(note === null ? [] : [note]);
   }
 
+  /**
+   * The next keys to play in a song, by hand: a filled marker for the right
+   * hand, an outlined one for the left (like the falling notes).
+   */
+  setUpcoming(keys: Iterable<{ midi: number; hand: 'L' | 'R' }>): void {
+    for (const key of this.track.querySelectorAll('.is-upcoming-l, .is-upcoming-r')) key.classList.remove('is-upcoming-l', 'is-upcoming-r');
+    for (const { midi, hand } of keys) this.keys.get(midi)?.classList.add(hand === 'L' ? 'is-upcoming-l' : 'is-upcoming-r');
+  }
+
   /** Keys marked in a comparison (the notes that differ). */
   setMarked(notes: Iterable<number>): void {
     for (const key of this.track.querySelectorAll('.is-compare')) key.classList.remove('is-compare');

@@ -194,7 +194,7 @@ export class PlayerView {
     this.raf = 0;
     this.player?.stop();
     this.fingerMenu.hidden = true;
-    this.keyboard.setHighlights([]);
+    this.keyboard.setUpcoming([]);
     this.keyboard.clearFingers();
     for (const n of this.litShown) this.keyboard.setLit(n, null);
     this.litShown.clear();
@@ -484,7 +484,7 @@ export class PlayerView {
     const sig = upcoming.map((n) => `${n.midi}:${n.finger ?? ''}:${n.hand}:${n.suggested ? 's' : ''}`).join(',');
     if (sig !== this.keysShown) {
       this.keysShown = sig;
-      this.keyboard.setHighlights(upcoming.map((n) => n.midi));
+      this.keyboard.setUpcoming(upcoming);
       this.keyboard.clearFingers();
       for (const n of upcoming) if (n.finger) this.keyboard.setFinger(n.midi, { finger: n.finger, hand: n.hand, suggested: n.suggested });
     }
@@ -592,6 +592,7 @@ export class PlayerView {
         : `${HAND_NAMES[player.config.hands]} · ${MODE_NAMES[player.config.mode]} at ${pct(player.config.tempo)}`;
       this.transport.replaceChildren(
         h('span.song-step-line', null, line),
+        handShapes(),
         h('button.button-outline', { type: 'button', disabled: !!this.previewing, onclick: () => this.listenFirst() }, icon('volume-2'), h('span', null, 'Hear it'), h('kbd', null, 'H')),
         h('button.button-outline', { type: 'button', onclick: () => this.restart() }, icon('rotate-ccw'), h('span', null, 'Restart'), h('kbd', null, 'R')),
       );
@@ -606,6 +607,7 @@ export class PlayerView {
       h('button.button-outline', { type: 'button', title: 'Restart (R)', onclick: () => this.restart() }, icon('rotate-ccw')),
       f.segmented<SongMode>('mode', (['wait', 'play-along', 'listen'] as SongMode[]).map((m) => ({ value: m, label: MODE_NAMES[m] })), this.settings.mode, (mode) => this.setSetting({ mode })),
       h('span.song-hands', { title: 'Change with the hand legend or 1 2 3' }, HAND_NAMES[this.hand]),
+      handShapes(),
       h(
         'span.song-tempo',
         null,
@@ -719,6 +721,18 @@ export class PlayerView {
       ),
     );
   }
+}
+
+/** How the hands look in the falling notes and on the keys. */
+function handShapes(): HTMLElement {
+  return h(
+    'span.hand-shapes',
+    { title: 'Right-hand notes are solid, left-hand notes are outlined' },
+    h('span.hand-shape.is-right', { 'aria-hidden': 'true' }),
+    h('span', null, 'right'),
+    h('span.hand-shape.is-left', { 'aria-hidden': 'true' }),
+    h('span', null, 'left'),
+  );
 }
 
 function present(...nodes: (Node | null)[]): Node[] {
