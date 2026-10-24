@@ -1118,7 +1118,8 @@ select.control {
 
 /* ── Library ────────────────────────────────────────────────────────────── */
 
-.app[data-screen='library'] > .stage {
+.app[data-screen='library'] > .stage,
+.app[data-screen='songs'] > .stage {
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: stretch;
   padding: var(--spacing-20);
@@ -1689,4 +1690,202 @@ select.control {
 
 .staff-reminder:empty {
   display: none;
+}
+
+/* ── Library tabs and Songs ────────────────────────────────────────────── */
+
+.library-area {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--spacing-10);
+  min-height: 0;
+}
+
+.library-tabs {
+  justify-self: center;
+  height: var(--control-height);
+}
+
+.songs {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: var(--spacing-10);
+  min-height: 0;
+  width: 100%;
+  max-width: var(--songs-max-width);
+  justify-self: center;
+  border-radius: var(--radius-default);
+}
+
+.songs.is-dropping {
+  outline: var(--border-divider) dashed var(--color-text-muted);
+  outline-offset: var(--spacing-5);
+}
+
+.songs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-10) var(--spacing-20);
+}
+
+.songs-toolbar .heading {
+  margin-right: auto;
+}
+
+.songs-drop-hint {
+  margin: 0;
+  font-size: var(--text-caption);
+}
+
+.songs-message {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.songs-message:empty {
+  display: none;
+}
+
+.songs-message.is-warning {
+  color: var(--color-wrong);
+}
+
+.song-list {
+  min-height: 0;
+  overflow: auto;
+  border-top: var(--border-hairline) solid var(--color-border);
+}
+
+.song-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) auto;
+  grid-template-areas:
+    'title meta actions'
+    'title progress actions';
+  align-items: center;
+  gap: var(--spacing-5) var(--spacing-20);
+  padding: var(--spacing-10);
+  border-bottom: var(--border-hairline) solid var(--color-border);
+}
+
+.song-title-block,
+.song-rename {
+  grid-area: title;
+  display: grid;
+  gap: var(--spacing-2);
+  justify-items: start;
+}
+
+.song-rename {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--spacing-5);
+}
+
+.song-title {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-bold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.song-title:hover {
+  text-decoration: underline;
+}
+
+.song-artist {
+  font-size: var(--text-caption);
+}
+
+.song-meta {
+  grid-area: meta;
+  margin: 0;
+  font-size: var(--text-caption);
+}
+
+.song-progress {
+  grid-area: progress;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-5) var(--spacing-10);
+  font-size: var(--text-caption);
+}
+
+.song-actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-5);
+  font-size: var(--text-caption);
+}
+
+.song-actions .button-outline {
+  height: auto;
+  padding: var(--spacing-2) var(--spacing-8);
+}
+
+/* One pip per section, filling up along the learning path (4 = learned). */
+.section-pips {
+  display: inline-flex;
+  gap: var(--spacing-2);
+}
+
+.section-pip {
+  width: var(--section-pip-width);
+  height: var(--section-pip-height);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-default);
+  background: linear-gradient(to right, var(--color-text) var(--pip-fill, 0%), transparent var(--pip-fill, 0%));
+}
+
+.section-pip[data-step='1'] { --pip-fill: 25%; }
+.section-pip[data-step='2'] { --pip-fill: 50%; }
+.section-pip[data-step='3'] { --pip-fill: 75%; }
+
+.section-pip[data-step='4'] {
+  border-color: var(--color-correct);
+  background: var(--color-correct);
+}
+
+.song-import {
+  display: grid;
+  gap: var(--spacing-10);
+  max-width: none;
+}
+
+.split-preview {
+  width: 100%;
+  height: var(--split-preview-height);
+  border: var(--border-hairline) solid var(--color-border);
+  border-radius: var(--radius-default);
+}
+
+.split-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-10);
+  font-weight: var(--font-weight-semibold);
+}
+
+.split-key {
+  min-width: 10ch;
+}
+
+.split-slider {
+  flex: 1;
+  accent-color: var(--color-text);
+}
+
+.split-counts {
+  margin: 0;
+  font-size: var(--text-caption);
 }

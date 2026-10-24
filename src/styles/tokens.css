@@ -63,6 +63,9 @@
   /* Notes that differ when comparing two chords or scales (Library). */
   --color-compare: #5f7d00;
   --color-compare-soft: #e6efc4;
+  /* Hands in songs (falling notes, the split preview). */
+  --color-hand-left: #1f6fd1;
+  --color-hand-right: #c25a12;
   --color-on-functional: var(--neutral-pure-white);
 
   /*
@@ -202,6 +205,10 @@
   --library-staff-min-height: 180px;
   /* Comfortable line length for the theory notes. */
   --library-about-measure: 62ch;
+  --songs-max-width: 1100px;
+  --section-pip-width: 18px;
+  --section-pip-height: 8px;
+  --split-preview-height: 180px;
   --metronome-pill-height: 28px;
   --metronome-dot-size: 6px;
   --metronome-dot-size-first: 8px;
@@ -258,6 +265,8 @@
     --color-wrong-soft: #45201a;
     --color-compare: #c5e352;
     --color-compare-soft: #2f3a10;
+    --color-hand-left: #5aa9ff;
+    --color-hand-right: #ff9a52;
     --color-on-functional: var(--neutral-carbon-black);
 
     --finger-1: #e8ad3a;
@@ -299,6 +308,8 @@
   --color-wrong-soft: #45201a;
   --color-compare: #c5e352;
   --color-compare-soft: #2f3a10;
+  --color-hand-left: #5aa9ff;
+  --color-hand-right: #ff9a52;
   --color-on-functional: var(--neutral-carbon-black);
 
   --finger-1: #e8ad3a;
