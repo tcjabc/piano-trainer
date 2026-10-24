@@ -4,6 +4,7 @@
  */
 import { SplendidGrandPiano, type Smplr, type StopFn } from 'smplr';
 import { Emitter } from './emitter';
+import { Metronome } from './metronome';
 
 export interface AudioLoad {
   loaded: number;
@@ -50,6 +51,11 @@ export class PianoAudio extends Emitter<AudioEvents> {
     };
     window.addEventListener('pointerdown', resume, true);
     window.addEventListener('keydown', resume, true);
+  }
+
+  /** The shared AudioContext (null until init), e.g. for the metronome. */
+  get audioContext(): AudioContext | null {
+    return this.context;
   }
 
   get running(): boolean {
@@ -113,3 +119,6 @@ export class PianoAudio extends Emitter<AudioEvents> {
 }
 
 export const audio = new PianoAudio();
+
+/** The app's metronome, sharing the piano's AudioContext (with its own volume). */
+export const metronome = new Metronome(() => audio.audioContext);

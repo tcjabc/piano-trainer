@@ -24,4 +24,10 @@ describe('settings', () => {
     const legacy = { visualiser: { enabled: true, colors: 'fingers', sparks: false } } as unknown as Parameters<typeof withDefaults>[0];
     expect(withDefaults(legacy).visualiser).toEqual({ enabled: true, colors: 'rainbow', sparks: false, overlay: true });
   });
+
+  it('fills in and repairs metronome settings', () => {
+    expect(withDefaults({}).metronome).toEqual(DEFAULT_SETTINGS.metronome);
+    const stored = { metronome: { bpm: 400, timeSignature: '9/8', subdivision: '16ths', volume: 3 } } as unknown as Parameters<typeof withDefaults>[0];
+    expect(withDefaults(stored).metronome).toMatchObject({ bpm: 240, timeSignature: '4/4', subdivision: '16ths', volume: 1, sound: 'click' });
+  });
 });

@@ -110,6 +110,9 @@
   --viz-fade-zone: 0.15; /* top part of the stage where bars fade out */
   --viz-repress-gap: 6; /* px between bars when a key is struck again */
   --viz-horizon-flash-ms: 450;
+  /* Metronome beat on the horizon: how long it fades, and how bright it starts (first beat). */
+  --viz-horizon-pulse-ms: 220;
+  --viz-horizon-pulse-alpha: 0.9;
   --viz-reduced-fade-ms: 500;
   --viz-ember-max: 600;
   --viz-ember-burst: 22; /* at full velocity */
@@ -194,6 +197,13 @@
   --play-card-max-width: 960px;
   --library-sidebar-width: 260px;
   --library-staff-min-height: 180px;
+  --metronome-pill-height: 28px;
+  --metronome-dot-size: 6px;
+  --metronome-dot-size-first: 8px;
+  --metronome-dot-gap: 4px;
+  /* How much a dot swells on its beat. */
+  --metronome-dot-pulse: 1.35;
+  --metronome-popover-width: 340px;
   --play-overlay-width: 320px;
   --play-overlay-staff-height: 150px;
   --hand-size: clamp(80px, calc(var(--keyboard-height) - var(--spacing-30)), 104px);

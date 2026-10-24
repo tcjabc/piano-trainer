@@ -30,7 +30,12 @@ export type ActionId =
   | 'zoom-out'
   | 'settings'
   | 'back'
-  | 'zoom';
+  | 'metronome'
+  | 'tap-tempo'
+  | 'tempo-up'
+  | 'tempo-down'
+  | 'zoom'
+  | 'tempo';
 
 export interface ActionInfo {
   id: ActionId;
@@ -59,7 +64,12 @@ export const ACTIONS: readonly ActionInfo[] = [
   { id: 'zoom-out', label: 'Zoom out', hotkey: '-' },
   { id: 'settings', label: 'Settings', hotkey: 'S' },
   { id: 'back', label: 'Back', hotkey: 'Esc' },
+  { id: 'metronome', label: 'Metronome start / stop', hotkey: 'M' },
+  { id: 'tap-tempo', label: 'Tap tempo', hotkey: 'B' },
+  { id: 'tempo-up', label: 'Tempo +1', hotkey: '.' },
+  { id: 'tempo-down', label: 'Tempo −1', hotkey: ',' },
   { id: 'zoom', label: 'Keyboard zoom (knob)', continuous: true },
+  { id: 'tempo', label: 'Tempo (knob)', continuous: true },
 ];
 
 export function actionInfo(id: ActionId): ActionInfo {

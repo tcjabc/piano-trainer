@@ -26,7 +26,7 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | `npm run dev` | Vite dev server with hot reload |
 | `npm run build` | Typecheck, then build the production app into `dist/` (with service worker) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | Unit tests (Vitest): chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
+| `npm test` | Unit tests (Vitest): metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
 | `npm run typecheck` | TypeScript only |
 
 ## Using it
@@ -134,6 +134,44 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings). Import merges by record, and the newer change wins.
 
+### Metronome
+
+The metronome pill in the header works on every screen: start/stop, the tempo, and beat dots that light in time (the first beat's dot is larger). Click the tempo for a small popover with every option; Esc or a click outside closes it.
+
+| Key | Action |
+| --- | --- |
+| M | Start / stop |
+| , / . | Tempo −1 / +1 (with Shift: −5 / +5) |
+| B | Tap tempo (the average of the last four taps; a two-second pause starts again) |
+| K | Metronome options (/ is the Library's search) |
+
+- **Tempo** 30–240 BPM. The BPM counts the beat: a quarter note in 2/4–5/4, a dotted quarter in 6/8 and 12/8, an eighth in 7/8.
+- **Time signatures:** 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 12/8. The first beat is accented. 6/8 and 12/8 click the dotted-quarter beats. 7/8 is counted 2+2+3, with lighter accents on 3 and 5.
+- **Subdivisions:** none, 8ths, triplets, 16ths, as quieter clicks. They are note values, so in 6/8 "8ths" gives the three eighths of each beat.
+- **Sounds:** click or woodblock, synthesised (no samples), with a volume of their own, independent of the piano.
+- **Count-in:** an optional bar of beats before bar 1 (the dots show it outlined).
+- **Visualiser pulse:** an optional setting; the horizon line brightens briefly on each beat while the visualiser is on.
+- **Reduced motion:** nothing pulses; the dots just change state.
+- **Never interferes:** the metronome never touches MIDI input, the piano or grading. Its settings are remembered.
+
+**Timing.** Clicks are scheduled on the AudioContext clock by a lookahead scheduler: a 25 ms timer schedules every click due in the next 100 ms. A busy main thread delays the scheduling, not the clicks. After a stall the scheduler looks further ahead (1.5 × the longest recent gap, up to 0.5 s), then eases back. Click times are the start time plus a whole number of click lengths, so they never drift. Tempo and subdivision changes start at the next beat; a time-signature change starts at the next bar.
+
+Measured in Chrome over 30 s at 120 BPM, by detecting each click's onset in the rendered audio with an AudioWorklet:
+- **Drift** was 0.
+- **Jitter** between heard clicks was ±0.021 ms (one sample at 48 kHz).
+- **Onset** came 0.10–0.13 ms after the scheduled time (the detector's threshold).
+- **Under load** (150 ms main-thread blocks every 400 ms) the results were the same.
+- **Beat dots** follow the sound by about 3 ms on average, or up to the length of a block on a busy main thread. They are display only.
+
+**API** (`metronome` in `src/core/audio.ts`; `src/core/metronome.ts`), for timed drills:
+- `start({ countIn })` returns the AudioContext time of the first downbeat.
+- `countIn()` starts with a bar of count-in and returns the downbeat time.
+- `stop()` stops.
+- `onBeat(fn)` reports beats for display.
+- `on('scheduled', fn)` reports each click with its exact time, ahead of time.
+- `nextBeatTime()` gives the time of the next beat.
+- `toPerformanceTime(t)` converts a click time to compare with MIDI event times.
+
 ## Controller buttons, pads and knobs (MIDI learn)
 
 **Settings → Controls** maps controls on your controller to app actions. Click **Learn**, then press a pad or button or turn a knob; **Esc** cancels. Each row shows the learned control, with **Re-learn** and **Clear**. If a control was already mapped to another action, it moves to the new one and a warning says so.
@@ -141,8 +179,8 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Ports:** the app listens on every MIDI port of the connected device, including the KeyLab's DAW port ("MIDIIN2 …") where the transport buttons send Mackie Control notes. Only the keys port plays notes. Messages from other ports never make a sound.
 - **What can be learned:** note-on pads, CC buttons (value above 63 is a press; only the press triggers), Mackie transport buttons, and HUI buttons (zone + port). Piano keys can't be learned. That means notes from the keys port within the keyboard's range, except on channel 10 where pads usually send. The sustain pedal can't be learned either.
 - **Mapped controls only run actions:** they never also play a note or count as a drill answer.
-- **Actions:** Play area, Study area, Library, Start/pause, Restart card, Skip/next, Previous, Hear answer, Toggle visualiser, Toggle fingering, Left/Right/Both hands, Zoom in/out, Settings and Back. A mapped control does what the matching key does on the current screen; where that key does nothing, so does the control.
-- **Knobs:** *Keyboard zoom (knob)* takes a knob. Its encoding (absolute, or one of three relative styles) is guessed from the first few values while you turn it. You can change it in the row if the guess is wrong. Tempo will be added here later.
+- **Actions:** Play area, Study area, Library, Start/pause, Restart card, Skip/next, Previous, Hear answer, Toggle visualiser, Toggle fingering, Left/Right/Both hands, Zoom in/out, Settings, Back, Metronome start/stop, Tap tempo and Tempo +1/−1. A mapped control does what the matching key does on the current screen; where that key does nothing, so does the control.
+- **Knobs:** *Keyboard zoom (knob)* and *Tempo (knob)* take a knob. The encoding (absolute, or one of three relative styles) is guessed from the first few values while you turn it. You can change it in the row if the guess is wrong. An absolute tempo knob spans 30–240 BPM; a relative one moves 1 BPM per step.
 - **Saving:** mappings are stored in settings and included in the JSON export. When there's room, the hint bar shows the mapped control next to each key. The hint bar never clips: when space is short it drops the mapped controls, then the less important hints, then the descriptions (keys only, with the description as a tooltip).
 
 ## Offline and updates
@@ -178,7 +216,8 @@ src/
   core/          UI-agnostic services
     midi.ts        Web MIDI: auto-connect, hot-plug, all ports of the device, note/CC events, status
     controls.ts    MIDI learn: actions, learned controls, HUI and knob decoding
-    audio.ts       smplr piano, velocity, sustain pedal, AudioContext resume
+    audio.ts       smplr piano, velocity, sustain pedal, AudioContext resume; the app's metronome
+    metronome.ts   metronome: tempo/meter maths, tap tempo, lookahead click scheduler, synthesised clicks
     notation.ts    VexFlow drawing: notes and chords on treble, bass, grand staff
     scheduler.ts   ts-fsrs wrapper, session queue
     grading.ts     grading thresholds for notes, chords and scales (one config)
@@ -193,7 +232,7 @@ src/
   modules/drill/ the drill (one card at a time), tasks for notes/chords/scales, chord/scale checking, sources
   modules/library/ catalog and search, Library view, decks, review status
   modules/play/  Play area: live staff and chord readout, chord detection, visualiser
-  ui/            header, keyboard, hand legend, staff panel, Today, settings, hotkeys, app shell
+  ui/            header (with the metronome pill), keyboard, hand legend, staff panel, Today, settings, hotkeys, app shell
   assets/        hand-right.svg (modified Vadivam "hand" icon)
   styles/        tokens.css (all design tokens), base.css, components.css
 build/vadivam.ts Vite plugin that inlines the Vadivam icons listed in src/ui/icon-list.ts

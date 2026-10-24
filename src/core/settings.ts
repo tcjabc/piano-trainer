@@ -1,5 +1,6 @@
 import type { ControlMap } from './controls';
 import { EMPTY_FILTER, type LibraryFilter } from './filter';
+import { CLICK_SOUNDS, clampBpm, DEFAULT_METRONOME, SUBDIVISIONS, TIME_SIGNATURES, type MetronomeSettings } from './metronome';
 import type { Clef } from './pitch';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -111,6 +112,7 @@ export interface Settings {
   scaleDrill: ScaleDrillSettings;
   /** The starter decks have been offered (once; they can be deleted). */
   starterDecksAdded: boolean;
+  metronome: MetronomeSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -148,6 +150,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chordDrill: { newPerDay: 5, showStaff: false },
   scaleDrill: { newPerDay: 3, direction: 'up' },
   starterDecksAdded: false,
+  metronome: DEFAULT_METRONOME,
 };
 
 const CLEF_FOR_HAND: Record<HandChoice, ClefChoice> = { left: 'bass', right: 'treble', both: 'both' };
@@ -173,6 +176,18 @@ function visualiserWithDefaults(partial: Partial<VisualiserSettings> | undefined
   return merged;
 }
 
+function metronomeWithDefaults(partial: Partial<MetronomeSettings> | undefined): MetronomeSettings {
+  const m = { ...DEFAULT_METRONOME, ...partial };
+  return {
+    ...m,
+    bpm: clampBpm(m.bpm),
+    timeSignature: TIME_SIGNATURES.includes(m.timeSignature) ? m.timeSignature : DEFAULT_METRONOME.timeSignature,
+    subdivision: SUBDIVISIONS.includes(m.subdivision) ? m.subdivision : DEFAULT_METRONOME.subdivision,
+    sound: CLICK_SOUNDS.includes(m.sound) ? m.sound : DEFAULT_METRONOME.sound,
+    volume: Number.isFinite(m.volume) ? Math.min(1, Math.max(0, m.volume)) : DEFAULT_METRONOME.volume,
+  };
+}
+
 /** Fill in any missing fields (e.g. after an app update adds a setting) and migrate old ones. */
 export function withDefaults(partial: LegacySettings | undefined): Settings {
   const { clef: legacyClef, ...noteDrill } = partial?.noteDrill ?? {};
@@ -190,6 +205,7 @@ export function withDefaults(partial: LegacySettings | undefined): Settings {
     },
     chordDrill: { ...DEFAULT_SETTINGS.chordDrill, ...partial?.chordDrill },
     scaleDrill: { ...DEFAULT_SETTINGS.scaleDrill, ...partial?.scaleDrill },
+    metronome: metronomeWithDefaults(partial?.metronome),
     freePractice: {
       ...DEFAULT_SETTINGS.freePractice,
       ...partial?.freePractice,

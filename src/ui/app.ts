@@ -11,13 +11,14 @@
  * learned controller buttons and knobs run actions through the same
  * shortcuts as the computer keyboard.
  */
-import { audio } from '../core/audio';
+import { audio, metronome } from '../core/audio';
 import { actionInfo, controls, describeBinding, shortBinding, type MidiMessage } from '../core/controls';
 import { DEFAULT_KEY_RANGE, keyRangeForDevice, midi, type KeyRange } from '../core/midi';
 import { notationReady } from '../core/notation';
 import { spellingToMidi } from '../core/pitch';
 import { noteDrillOptions, type HandChoice, type LibrarySettings, type Settings } from '../core/settings';
 import { storage, uuid, type DeckRecord } from '../core/storage';
+import { MAX_BPM, MIN_BPM } from '../core/metronome';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
 import { Drill } from '../modules/drill/drill';
@@ -37,6 +38,7 @@ import { HandLegend } from './hand-legend';
 import { Header, type Area } from './header';
 import { Hotkeys, type Hotkey } from './hotkeys';
 import { Keyboard } from './keyboard';
+import { MetronomePill } from './metronome-pill';
 import { SettingsView } from './settings';
 import { StaffView } from './staff';
 import { applyTheme } from './theme';
@@ -56,6 +58,10 @@ const PAD_CHANNEL = 9;
 /** Zoom change per step of a relative knob. */
 const KNOB_ZOOM_STEP = 0.02;
 const KNOB_SAVE_DELAY_MS = 500;
+/** Metronome keys (T is Study and / is Library search, so options open with K). */
+const METRONOME_KEYS = { toggle: 'M', tap: 'B', open: 'K' };
+/** A tempo knob's absolute range maps onto 30–240 BPM; relative knobs move 1 BPM per step. */
+const KNOB_TEMPO_STEP = 1;
 
 export class App {
   private settings: Settings;
@@ -80,6 +86,7 @@ export class App {
   /** Keys of the connected keyboard (or the 61-key default). */
   private deviceRange: KeyRange = DEFAULT_KEY_RANGE;
   private knobSaveTimer = 0;
+  private metronomeSaveTimer = 0;
 
   private header = new Header(
     () => this.show('settings'),
@@ -90,6 +97,7 @@ export class App {
   private visualiser = new Visualiser(this.keyboard);
   private hands = new HandLegend();
   private zoom = new ZoomControl();
+  private metronomePill = new MetronomePill(metronome, METRONOME_KEYS);
   private hotkeys = new Hotkeys();
   private updateToast = new UpdateToast();
   private stage = h('main.stage');
@@ -152,7 +160,9 @@ export class App {
         this.updateToast.el,
       ),
     );
+    this.header.setMetronome(this.metronomePill.el);
     this.applySettings();
+    this.wireMetronome();
     this.zoom.on('input', (z) => this.keyboard.setZoom(z));
     this.zoom.on('commit', (z) => void this.patchSettings({ keyboardZoom: z }));
     this.hands.on('change', (hand) => (this.inFreePractice ? this.setFreeHand(hand) : void this.setHand(hand)));
@@ -257,6 +267,10 @@ export class App {
     controls.on('action', (action) => this.hotkeys.trigger(action));
     controls.on('continuous', ({ action, absolute, delta }) => {
       if (action === 'zoom') this.knobZoom(absolute ?? this.settings.keyboardZoom + (delta ?? 0) * KNOB_ZOOM_STEP);
+      if (action === 'tempo') {
+        if (absolute !== undefined) metronome.setBpm(MIN_BPM + absolute * (MAX_BPM - MIN_BPM));
+        else metronome.nudge((delta ?? 0) * KNOB_TEMPO_STEP);
+      }
     });
     controls.on('learned', ({ action, binding, replaced }) => {
       const name = describeBinding(binding, midi.ports[0] ?? null);
@@ -295,6 +309,26 @@ export class App {
     this.knobSaveTimer = window.setTimeout(() => void this.patchSettings({ keyboardZoom: z }), KNOB_SAVE_DELAY_MS);
   }
 
+  /**
+   * The metronome keeps its own copy of its settings (changed from the pill,
+   * hotkeys and knobs); they are saved shortly after they settle. Its beats
+   * can pulse the visualiser's horizon. It never touches MIDI input or grading.
+   */
+  private wireMetronome(): void {
+    metronome.on('settings', (m) => {
+      this.settings = { ...this.settings, metronome: m };
+      // Keep the settings screen's copy current so its next save doesn't undo this.
+      this.settingsView.setSettings(this.settings, false);
+      window.clearTimeout(this.metronomeSaveTimer);
+      this.metronomeSaveTimer = window.setTimeout(() => void this.patchSettings({ metronome: metronome.settings }), KNOB_SAVE_DELAY_MS);
+    });
+    metronome.onBeat((beat) => {
+      if (beat.sub === 0 && metronome.settings.pulseVisualiser && this.visualiserOn) {
+        this.visualiser.pulse(beat.level === 'accent' ? 1 : 0.5);
+      }
+    });
+  }
+
   /** Push the current settings to every part of the UI. */
   private applySettings(): void {
     const s = this.settings;
@@ -311,6 +345,7 @@ export class App {
     this.library.setSettings(s.library);
     this.library.setFingering(s.showFingerNumbers);
     controls.setBindings(s.controls);
+    metronome.setSettings(s.metronome);
     this.hotkeys.render();
     this.updateKeyboardRange();
     this.updateVisualiser();
@@ -660,9 +695,17 @@ export class App {
     ];
   }
 
-  /** Zoom, area and fingering keys, on every screen. P and T are shown on the header tabs instead. */
+  /** Metronome, zoom, area and fingering keys, on every screen. P and T are shown on the header tabs instead. */
   private commonHotkeys(): Hotkey[] {
+    const k = METRONOME_KEYS;
     return [
+      { keys: [k.toggle.toLowerCase()], label: k.toggle, hint: 'Metronome', action: 'metronome', optional: true, run: () => metronome.toggle() },
+      { keys: [k.tap.toLowerCase()], label: k.tap, hint: 'Tap tempo', action: 'tap-tempo', optional: true, run: () => void metronome.tap() },
+      { keys: [k.open.toLowerCase()], label: k.open, hint: '', hidden: true, run: () => this.metronomePill.toggleOptions() },
+      { keys: [','], label: ',', hint: '', hidden: true, action: 'tempo-down', run: () => metronome.nudge(-1) },
+      { keys: ['.'], label: '.', hint: '', hidden: true, action: 'tempo-up', run: () => metronome.nudge(1) },
+      { keys: ['<'], label: '<', hint: '', hidden: true, run: () => metronome.nudge(-5) },
+      { keys: ['>'], label: '>', hint: '', hidden: true, run: () => metronome.nudge(5) },
       { keys: ['-'], label: '- = 0', hint: 'Zoom', action: 'zoom-out', optional: true, run: () => this.zoom.step(-1) },
       { keys: ['=', '+'], label: '=', hint: '', hidden: true, action: 'zoom-in', run: () => this.zoom.step(1) },
       { keys: ['0'], label: '0', hint: '', hidden: true, run: () => this.zoom.fit() },

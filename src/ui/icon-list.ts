@@ -23,6 +23,10 @@ export const ICON_NAMES = [
   'check',
   'zoom-in',
   'zoom-out',
+  'metronome',
+  'square',
+  'minus',
+  'plus',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];

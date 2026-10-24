@@ -1,4 +1,4 @@
-/** Slim app header: name, area tabs (Play / Study / Library), MIDI status, sample loading, due count, settings. */
+/** Slim app header: name, area tabs (Play / Study / Library), metronome, MIDI status, sample loading, due count, settings. */
 import type { AudioLoad } from '../core/audio';
 import type { MidiStatus } from '../core/midi';
 import { h, icon } from './dom';
@@ -17,6 +17,7 @@ export class Header {
   private midiEl: HTMLElement;
   private audioEl: HTMLElement;
   private dueEl: HTMLElement;
+  private metaEl: HTMLElement;
   private tabs: Map<Area, HTMLButtonElement>;
 
   constructor(onSettings: () => void, onArea: (area: Area) => void) {
@@ -43,7 +44,7 @@ export class Header {
         h('div.brand', null, icon('piano'), h('span', null, 'Piano Trainer')),
         h('nav.tabs', { 'aria-label': 'Areas' }, ...this.tabs.values()),
       ),
-      h(
+      (this.metaEl = h(
         'div.header-meta',
         null,
         this.audioEl,
@@ -54,9 +55,14 @@ export class Header {
           { type: 'button', title: 'Settings (S)', 'aria-label': 'Settings', onclick: onSettings },
           icon('settings'),
         ),
-      ),
+      )),
     );
     this.setMidi({ kind: 'pending' });
+  }
+
+  /** Put the metronome pill at the start of the status area. */
+  setMetronome(el: HTMLElement): void {
+    this.metaEl.prepend(el);
   }
 
   setMidi(status: MidiStatus): void {

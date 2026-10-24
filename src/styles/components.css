@@ -1428,3 +1428,168 @@ select.control {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ── Metronome (header pill and popover) ─────────────────────────────────── */
+
+.metronome {
+  display: inline-flex;
+  align-items: center;
+  height: var(--metronome-pill-height);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-buttons);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-caption);
+  white-space: nowrap;
+}
+
+.metronome-toggle {
+  width: var(--metronome-pill-height);
+  height: 100%;
+  border-radius: var(--radius-buttons) 0 0 var(--radius-buttons);
+}
+
+.metronome-toggle .icon {
+  font-size: var(--icon-size-sm);
+}
+
+.metronome.is-running .metronome-toggle {
+  background: var(--color-primary-bg);
+  color: var(--color-primary-fg);
+}
+
+.metronome-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  height: 100%;
+  padding: 0 var(--spacing-10) 0 var(--spacing-8);
+  border: none;
+  border-left: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: 0 var(--radius-buttons) var(--radius-buttons) 0;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.metronome-open:hover {
+  background: var(--color-border);
+}
+
+.metronome-open .icon {
+  font-size: var(--icon-size-sm);
+}
+
+.metronome-bpm {
+  min-width: 3ch;
+  text-align: right;
+}
+
+.metronome-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--metronome-dot-gap);
+}
+
+.metronome-dot {
+  width: var(--metronome-dot-size);
+  height: var(--metronome-dot-size);
+  border: var(--border-hairline) solid var(--color-text-muted);
+  border-radius: 50%;
+  transition: transform var(--duration-feedback) var(--easing), background-color var(--duration-feedback) var(--easing);
+}
+
+/* The first beat is stronger: a larger dot. */
+.metronome-dot.is-first {
+  width: var(--metronome-dot-size-first);
+  height: var(--metronome-dot-size-first);
+  border-color: var(--color-text);
+}
+
+.metronome-dot.is-on {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  transform: scale(var(--metronome-dot-pulse));
+  transition: none;
+}
+
+.metronome-dot.is-on.is-fading {
+  transform: none;
+  transition: transform var(--duration-feedback) var(--easing);
+}
+
+/* Count-in: hollow beats stay hollow, the lit one is outlined only. */
+.metronome.is-count-in .metronome-dot.is-on {
+  background: transparent;
+  border-width: var(--border-divider);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No pulse: the dots just change state. */
+  .metronome-dot,
+  .metronome-dot.is-on,
+  .metronome-dot.is-on.is-fading {
+    transform: none;
+    transition: none;
+  }
+}
+
+.metronome-popover {
+  position: fixed;
+  inset: auto;
+  width: var(--metronome-popover-width);
+  max-width: calc(100vw - var(--spacing-20));
+  margin: 0;
+  padding: var(--spacing-20);
+  border: var(--border-hairline) solid var(--color-border);
+  border-radius: var(--radius-default);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-card);
+}
+
+.metronome-popover:popover-open {
+  display: grid;
+  gap: var(--spacing-10);
+}
+
+.metronome-popover .segmented {
+  flex-wrap: wrap;
+}
+
+.metronome-popover .segment {
+  padding: 0 var(--spacing-8);
+}
+
+.metronome-tempo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-5);
+}
+
+/* Labels above their controls: the popover is narrow. */
+.metronome-popover .field {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-5);
+}
+
+.metronome-popover:focus {
+  outline: none;
+}
+
+.metronome-tap {
+  margin-left: auto;
+}
+
+.metronome-tempo-slider,
+.metronome-volume {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--color-text);
+}
+
+.metronome-keys {
+  margin: 0;
+  font-size: var(--text-caption);
+}

@@ -77,6 +77,8 @@ interface Tokens {
   fadeZone: number;
   repressGap: number;
   flashMs: number;
+  pulseMs: number;
+  pulseAlpha: number;
   reducedFadeMs: number;
   emberMax: number;
   emberBurst: number;
@@ -135,6 +137,9 @@ export class Visualiser {
   private horizonGradient: CanvasGradient | null = null;
   private fadeGradient: CanvasGradient | null = null;
   private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  /** Metronome pulse on the horizon: when it started (ms, rAF clock) and how strong (0–1). */
+  private pulseBorn = -Infinity;
+  private pulseStrength = 0;
   private drawTimes: number[] = [];
   private intervals: number[] = [];
 
@@ -177,6 +182,21 @@ export class Visualiser {
     this.embersOn = on;
   }
 
+  /**
+   * Brighten the horizon briefly, on a metronome beat (stronger on the first
+   * beat). Nothing happens with reduced motion.
+   */
+  pulse(strength: number): void {
+    if (!this.active || this.reducedMotion.matches) return;
+    this.pulseBorn = performance.now();
+    this.pulseStrength = strength;
+    this.kick();
+  }
+
+  private get pulsing(): boolean {
+    return performance.now() - this.pulseBorn < this.tokens.pulseMs;
+  }
+
   /** The note's colour in the current preset (also used to light the pressed key). */
   colorFor(note: number): string {
     const t = this.tokens;
@@ -207,6 +227,8 @@ export class Visualiser {
       fadeZone: num('--viz-fade-zone', 0.15),
       repressGap: num('--viz-repress-gap', 6),
       flashMs: num('--viz-horizon-flash-ms', 450),
+      pulseMs: num('--viz-horizon-pulse-ms', 220),
+      pulseAlpha: num('--viz-horizon-pulse-alpha', 0.9),
       reducedFadeMs: num('--viz-reduced-fade-ms', 500),
       emberMax: num('--viz-ember-max', 600),
       emberBurst: num('--viz-ember-burst', 22),
@@ -345,7 +367,7 @@ export class Visualiser {
     const t0 = performance.now();
     this.draw(now, dt);
     this.record(this.drawTimes, performance.now() - t0);
-    if (this.bars.length > 0 || this.embers.length > 0 || this.flashes.length > 0) {
+    if (this.bars.length > 0 || this.embers.length > 0 || this.flashes.length > 0 || this.pulsing) {
       this.raf = requestAnimationFrame(this.frame);
     }
   };
@@ -394,6 +416,13 @@ export class Visualiser {
     // Horizon: a faint line along the keyboard edge, flashing in each new note's colour.
     ctx.fillStyle = this.horizonGradient!;
     ctx.fillRect(0, H - 14 * dpr, W, 14 * dpr);
+    // Metronome pulse: the same glow again, fading out.
+    const pulseAge = (now - this.pulseBorn) / t.pulseMs;
+    if (pulseAge >= 0 && pulseAge < 1) {
+      ctx.globalAlpha = (1 - pulseAge) * (1 - pulseAge) * this.pulseStrength * t.pulseAlpha;
+      ctx.fillRect(0, H - 14 * dpr, W, 14 * dpr);
+      ctx.globalAlpha = 1;
+    }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const f = this.flashes[i]!;
       const age = (now - f.born) / t.flashMs;
