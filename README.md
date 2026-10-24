@@ -141,7 +141,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Ninths:** all five fingers.
 - **F** hides fingering everywhere.
 
-**Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings). Import merges by record, and the newer change wins.
+**Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings, and imported songs with their fingering edits, sections and learning progress). Import merges by record, and the newer change wins. Bundled songs aren't exported, since every device adds its own; their progress and review cards are matched to that copy.
 
 ### Songs (Library → Songs, **G**)
 
@@ -300,7 +300,7 @@ src/
     notation.ts    VexFlow drawing: notes and chords on treble, bass, grand staff
     scheduler.ts   ts-fsrs wrapper, session queue
     grading.ts     grading thresholds for notes, chords and scales (one config)
-    storage.ts     the only IndexedDB module (cards, reviews, settings, attempts, decks, export/import)
+    storage.ts     the only IndexedDB module (cards, reviews, settings, attempts, decks, songs, export/import)
     chords.ts      chord qualities, roots, spelling, inversions, formulas, voicings
     scales.ts      scale types, tonics, spelling, played sequences
     fingerings.ts  standard fingerings as data (scales, chords, both hands)

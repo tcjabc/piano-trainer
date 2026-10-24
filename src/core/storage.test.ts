@@ -1,10 +1,14 @@
+// @vitest-environment happy-dom
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { newSongCard } from '../modules/drill/items';
 import { newCard } from '../modules/notes/cards';
+import { BUNDLED_SONGS, musicXmlRecord } from '../modules/songs/import';
 import { recordReview, Rating } from './scheduler';
 import { DEFAULT_SETTINGS } from './settings';
-import { Storage } from './storage';
+import { newProgress } from './song-learning';
+import { Storage, type SongRecord } from './storage';
 
 let db: Storage;
 let n = 0;
@@ -49,6 +53,45 @@ describe('storage', () => {
     expect(await other.getCards('notes')).toEqual([result.card]);
     expect((await other.getSettings()).theme).toBe('light');
     await other.close();
+  });
+
+  it('exports imported songs with their progress and fingering; bundled songs are matched, not copied', async () => {
+    const twinkle = BUNDLED_SONGS.find((b) => b.id === 'twinkle-twinkle')!;
+    const ode = BUNDLED_SONGS.find((b) => b.id === 'ode-to-joy')!;
+    const bundled = musicXmlRecord(twinkle.xml, 'twinkle-twinkle.musicxml', 'twinkle-twinkle', NOW);
+    const imported = musicXmlRecord(ode.xml, 'my-ode.musicxml', null, NOW);
+    // A fingering edit on the imported song.
+    const [first, ...rest] = imported.data.notes;
+    const edited = { ...imported, data: { ...imported.data, notes: [{ ...first!, finger: 3 as const, suggested: false }, ...rest] }, updatedAt: NOW + 1 };
+    await db.putSong(bundled);
+    await db.putSong(edited);
+    const progress = (songId: string, sectionId: string) => ({ ...newProgress(), step: 2, passes: 4, id: `${songId}:${sectionId}`, songId, sectionId, updatedAt: NOW + 2 });
+    await db.putSongProgress(progress(bundled.id, bundled.sections[0]!.id));
+    await db.putSongProgress(progress(edited.id, edited.sections[1]!.id));
+    await db.putCards([newSongCard({ songId: bundled.id, sectionId: bundled.sections[0]!.id }, NOW), newSongCard({ songId: edited.id, sectionId: edited.sections[1]!.id }, NOW)]);
+
+    const file = JSON.parse(JSON.stringify(await db.exportAll()));
+    expect(file.songs.map((s: SongRecord) => s.id)).toEqual([edited.id]);
+    expect(file.bundledSongs).toEqual([{ id: bundled.id, bundled: 'twinkle-twinkle' }]);
+
+    // Another device, with its own copy of the bundled song.
+    const other = new Storage(`test-${++n}`);
+    const local = musicXmlRecord(twinkle.xml, 'twinkle-twinkle.musicxml', 'twinkle-twinkle', NOW);
+    await other.putSong(local);
+    expect(await other.importAll(file)).toMatchObject({ cards: 2, songs: 1, songProgress: 2 });
+    expect((await other.getSongs()).map((s) => s.id).sort()).toEqual([local.id, edited.id].sort());
+    expect((await other.getSong(edited.id))?.data.notes[0]).toMatchObject({ finger: 3, suggested: false });
+    expect((await other.getSongProgress(edited.id)).map((p) => [p.sectionId, p.step, p.passes])).toEqual([[edited.sections[1]!.id, 2, 4]]);
+    expect((await other.getSongProgress(local.id)).map((p) => [p.id, p.step])).toEqual([[`${local.id}:${local.sections[0]!.id}`, 2]]);
+    expect((await other.getCards('songs')).map((c) => c.key).sort()).toEqual(
+      [`songs:${local.id}:${local.sections[0]!.id}`, `songs:${edited.id}:${edited.sections[1]!.id}`].sort(),
+    );
+    await other.close();
+
+    // A device that deleted the bundled song: its progress and card are left out.
+    const without = new Storage(`test-${++n}`);
+    expect(await without.importAll(file)).toMatchObject({ cards: 1, songs: 1, songProgress: 1 });
+    await without.close();
   });
 
   it('keeps the newer record when the same card key exists with another id', async () => {

@@ -993,7 +993,8 @@ export class App {
       await this.reviews.load();
       await this.loadDecks();
       this.library.refreshDetail();
-      return `Imported ${result.cards} cards, ${result.reviews} reviews, ${result.decks} decks and ${result.settings} settings records.`;
+      await this.loadSongs();
+      return `Imported ${result.cards} cards, ${result.reviews} reviews, ${result.decks} decks, ${result.songs} songs, ${result.songProgress} section progress records and ${result.settings} settings records.`;
     } catch (err) {
       return err instanceof SyntaxError ? 'That file is not valid JSON.' : (err as Error).message;
     }

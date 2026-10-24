@@ -166,9 +166,18 @@ export interface ExportFile {
   attempts?: AttemptRecord[];
   /** Decks (missing in exports made before decks existed). */
   decks?: DeckRecord[];
-  /** Songs and their progress (missing in exports made before songs existed). */
+  /**
+   * Imported songs (with their fingering and section edits) and the progress
+   * of every song (missing in exports made before songs existed). Bundled
+   * songs are re-seeded on each device rather than exported.
+   */
   songs?: SongRecord[];
   songProgress?: SongProgressRecord[];
+  /**
+   * The exporting device's ids for its bundled songs, so their progress and
+   * review cards can be matched to this device's copies.
+   */
+  bundledSongs?: { id: string; bundled: string }[];
 }
 
 export interface ImportSummary {
@@ -403,6 +412,7 @@ export class Storage {
 
   async exportAll(): Promise<ExportFile> {
     const db = await this.db();
+    const songs = await db.getAll('songs');
     return {
       app: 'piano-trainer',
       schemaVersion: 1,
@@ -412,14 +422,17 @@ export class Storage {
       settings: await db.getAll('settings'),
       attempts: await db.getAll('attempts'),
       decks: await db.getAll('decks'),
-      songs: await db.getAll('songs'),
+      songs: songs.filter((s) => s.bundled === null),
       songProgress: await db.getAll('songProgress'),
+      bundledSongs: songs.flatMap((s) => (s.bundled === null ? [] : [{ id: s.id, bundled: s.bundled }])),
     };
   }
 
   /**
    * Merge an export into the database. Records are matched by `id` (and
    * cards/settings also by their unique `key`); the newer `updatedAt` wins.
+   * Bundled songs aren't imported: their progress and review cards move to
+   * this device's copy of the same song, and are skipped if it was deleted.
    */
   async importAll(data: unknown): Promise<ImportSummary> {
     const file = validateExport(data);
@@ -427,8 +440,26 @@ export class Storage {
     const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts', 'decks', 'songs', 'songProgress'], 'readwrite');
     const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0, decks: 0, songs: 0, songProgress: 0 };
 
+    // The file's bundled-song ids → this device's (older exports carried the bundled songs themselves).
+    const songs = tx.objectStore('songs');
+    const localBundled = new Map((await songs.getAll()).flatMap((s) => (s.bundled === null ? [] : [[s.bundled, s.id] as const])));
+    const bundledIds = new Map<string, string | null>();
+    for (const { id, bundled } of [...(file.bundledSongs ?? []), ...(file.songs ?? []).flatMap((s) => (s.bundled === null ? [] : [{ id: s.id, bundled: s.bundled }]))]) {
+      bundledIds.set(id, localBundled.get(bundled) ?? null);
+    }
+    /** A song id from the file as it is here; null when it is a bundled song deleted here. */
+    const songIdHere = (id: string) => (bundledIds.has(id) ? bundledIds.get(id)! : id);
+
     const cards = tx.objectStore('cards');
-    for (const incoming of file.cards) {
+    for (const raw of file.cards) {
+      let incoming = raw;
+      if (incoming.module === 'songs') {
+        const songId = songIdHere(incoming.content.songId);
+        if (songId === null) continue;
+        if (songId !== incoming.content.songId) {
+          incoming = { ...incoming, key: incoming.key.replace(`:${incoming.content.songId}:`, `:${songId}:`), content: { ...incoming.content, songId } };
+        }
+      }
       const sameKey = await cards.index('key').get(incoming.key);
       const sameId = await cards.get(incoming.id);
       const existing = sameKey ?? sameId;
@@ -472,8 +503,8 @@ export class Storage {
       summary.decks++;
     }
 
-    const songs = tx.objectStore('songs');
     for (const incoming of file.songs ?? []) {
+      if (incoming.bundled !== null) continue;
       const existing = await songs.get(incoming.id);
       if (existing && existing.updatedAt >= incoming.updatedAt) continue;
       await songs.put(incoming);
@@ -481,7 +512,10 @@ export class Storage {
     }
 
     const songProgress = tx.objectStore('songProgress');
-    for (const incoming of file.songProgress ?? []) {
+    for (const raw of file.songProgress ?? []) {
+      const songId = songIdHere(raw.songId);
+      if (songId === null) continue;
+      const incoming = songId === raw.songId ? raw : { ...raw, id: `${songId}:${raw.sectionId}`, songId };
       const existing = await songProgress.get(incoming.id);
       if (existing && existing.updatedAt >= incoming.updatedAt) continue;
       await songProgress.put(incoming);
@@ -502,6 +536,9 @@ function validateExport(data: unknown): ExportFile {
     Array.isArray(rows) &&
     rows.every((r) => typeof r?.id === 'string' && typeof r?.updatedAt === 'number');
   if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || (f.attempts !== undefined && !hasIds(f.attempts)) || (f.decks !== undefined && !hasIds(f.decks)) || (f.songs !== undefined && !hasIds(f.songs)) || (f.songProgress !== undefined && !hasIds(f.songProgress))) {
+    throw new Error('The export file is incomplete or damaged.');
+  }
+  if (f.bundledSongs !== undefined && !(Array.isArray(f.bundledSongs) && f.bundledSongs.every((b) => typeof b?.id === 'string' && typeof b?.bundled === 'string'))) {
     throw new Error('The export file is incomplete or damaged.');
   }
   return f as ExportFile;
