@@ -30,6 +30,7 @@ import { SettingsView } from './settings';
 import { StaffView } from './staff';
 import { applyTheme } from './theme';
 import { TodayView } from './today';
+import { UpdateToast } from './update-toast';
 import { ZoomControl } from './zoom-control';
 
 type Screen = 'play' | 'today' | 'drill' | 'settings';
@@ -65,6 +66,7 @@ export class App {
   private hands = new HandLegend();
   private zoom = new ZoomControl();
   private hotkeys = new Hotkeys();
+  private updateToast = new UpdateToast();
   private stage = h('main.stage');
   private staff = new StaffView();
   private today = new TodayView({ start: () => this.startDrill(false), practiseAhead: () => this.startDrill(true) });
@@ -96,6 +98,7 @@ export class App {
         h('div.keyboard-toolbar', null, this.hotkeys.el, this.zoom.el),
         this.visualiser.el,
         h('div.keyboard-dock', null, this.keyboard.el, this.hands.el),
+        this.updateToast.el,
       ),
     );
     this.applySettings();
@@ -116,6 +119,16 @@ export class App {
       notationReady().then(() => this.play.render()),
       this.refreshSummary(),
     ]);
+  }
+
+  /** True while a drill is running (an update then waits for the user). */
+  get busy(): boolean {
+    return this.screen === 'drill';
+  }
+
+  /** A new version is ready: offer it quietly. */
+  offerUpdate(apply: () => void): void {
+    this.updateToast.show(apply);
   }
 
   /** Learned controller buttons and knobs. */

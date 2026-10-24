@@ -237,6 +237,7 @@ export class SettingsView {
         ),
         h('p.muted.field-note', null, 'Cards, review history and settings. Importing merges by record; newer changes win.'),
         this.message,
+        h('p.muted.field-note', null, 'Version: build ', h('span.num', null, buildLabel())),
       ),
     );
 
@@ -348,6 +349,13 @@ export class SettingsView {
     await this.actions.exportData();
     this.message.textContent = 'Export saved to your downloads.';
   }
+}
+
+/** The build timestamp in local time, e.g. "2026-10-24 23:41". */
+function buildLabel(): string {
+  const d = new Date(__APP_BUILD__);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 // ── Small form builders ────────────────────────────────────────────────────

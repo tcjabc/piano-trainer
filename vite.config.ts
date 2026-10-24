@@ -7,14 +7,21 @@ const BASE = '/piano-trainer/';
 
 export default defineConfig({
   base: BASE,
-  // VexFlow (with its embedded Bravura font) and smplr make one large chunk; that is expected.
-  build: { chunkSizeWarningLimit: 1200 },
+  define: {
+    // Shown in Settings, so an update is easy to confirm.
+    __APP_BUILD__: JSON.stringify(new Date().toISOString()),
+  },
+  build: {
+    sourcemap: false,
+    // VexFlow (with its embedded Bravura font) and smplr make one large chunk; that is expected.
+    chunkSizeWarningLimit: 1200,
+  },
   plugins: [
     vadivamIcons(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // A new version waits until the user accepts it (or the app was just opened); see src/main.ts.
+      registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['fonts/Chillax-{Medium,Semibold,Bold}.woff2', 'icon.svg'],
       manifest: {
         name: 'Piano Trainer',
         short_name: 'Piano Trainer',
@@ -27,19 +34,39 @@ export default defineConfig({
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // Only the 500–700 Chillax weights are used.
-        globIgnores: ['**/Chillax-{Extralight,Light,Regular,Variable}.woff2'],
+        // Hashed JS/CSS and the font (the plugin adds the manifest and its icon itself).
+        // index.html is not precached: it is fetched network-first (below) so a new deploy is picked up.
+        globPatterns: ['**/*.{js,css,woff2}'],
+        globIgnores: ['**/*.map', 'index.html'],
+        navigateFallback: null,
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        // The waiting worker takes over only when the update is accepted.
+        skipWaiting: false,
         // The app bundle includes VexFlow's embedded music font.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        // Piano samples come from smplr's CDN; cache each file the first time it loads.
         runtimeCaching: [
           {
+            // The page itself: network first (3 s), cached copy when offline.
+            // (Serialised into the service worker, so the base path is written out.)
+            urlPattern: ({ request, url }) =>
+              request.mode === 'navigate' ||
+              (url.origin === self.location.origin &&
+                (url.pathname === '/piano-trainer/' || url.pathname === '/piano-trainer/index.html')),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'piano-trainer-pages',
+              networkTimeoutSeconds: 3,
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // Piano samples from smplr's CDN, cached the first time each loads. Its own cache,
+            // with no expiry, so app updates never remove it.
             urlPattern: ({ url }) => url.origin === 'https://smpldsnds.github.io',
             handler: 'CacheFirst',
             options: {
               cacheName: 'piano-samples',
-              expiration: { maxEntries: 1000 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

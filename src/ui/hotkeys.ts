@@ -19,7 +19,7 @@ export interface Hotkey {
   action?: ActionId;
 }
 
-const isTyping = (target: EventTarget | null) =>
+export const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   target.matches('input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea');
 

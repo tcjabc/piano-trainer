@@ -92,9 +92,21 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Knobs:** *Keyboard zoom (knob)* takes a knob. Its encoding (absolute, or one of three relative styles) is guessed from the first few values while you turn it. You can change it in the row if the guess is wrong. Tempo will be added here later.
 - **Saving:** mappings are stored in settings and included in the JSON export. When there's room, the hint bar shows the mapped control next to each key.
 
-## Offline
+## Offline and updates
 
-The app shell, fonts, icons and the VexFlow music font are precached by the service worker. The piano samples (smplr's Splendid Grand Piano, from `smpldsnds.github.io`) are cached as they load, so the app works offline after one online session. The app also asks the browser to keep its storage persistent.
+The service worker precaches the hashed JS and CSS (which includes VexFlow's music font), the Chillax variable font, the icon and the manifest: 6 entries, about 940 KiB. Source maps aren't built.
+
+- **The page:** `index.html` is fetched network-first with a 3-second timeout and falls back to the cached copy offline, so a new deploy is picked up as soon as you're online.
+- **Piano samples:** smplr's Splendid Grand Piano, from `smpldsnds.github.io`. They live in their own cache-first cache (`piano-samples`), filled as they load. App updates never clear it, so after one online session the app works fully offline.
+- **Updates:** a new version installs in the background and waits. A quiet "Update available — Reload" toast appears; press **U** or click Reload to switch. If the update is found within 10 seconds of opening the app and no drill is running, it's applied straight away. An open app checks for updates hourly and whenever it comes back to the foreground. Old precaches are cleaned up.
+- **Your data is safe:** IndexedDB (cards, reviews, settings) is never touched by an update. The app also asks the browser to keep its storage persistent.
+- **Version:** shown under Settings → Data (the build time), so you can tell when an update has landed.
+
+To try the production build and its service worker locally:
+
+```bash
+npm run build && npm run preview
+```
 
 ## Deploying to GitHub Pages
 

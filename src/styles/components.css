@@ -999,3 +999,26 @@ select.control {
 .hint-bar.is-compact .hint-control {
   display: none;
 }
+
+/* ── Update toast ───────────────────────────────────────────────────────── */
+
+.update-toast {
+  position: fixed;
+  left: var(--spacing-20);
+  bottom: calc(var(--keyboard-height) + var(--toolbar-height) + var(--spacing-10));
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-10);
+  padding: var(--spacing-8) var(--spacing-10) var(--spacing-8) var(--spacing-20);
+  border-radius: var(--radius-default);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-caption);
+}
+
+.update-toast[hidden] {
+  display: none;
+}
