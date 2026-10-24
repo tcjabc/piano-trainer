@@ -12,7 +12,7 @@
  */
 import type { Finger } from '../../core/fingering';
 import type { HandChoice, SongSettings, VisualiserColors } from '../../core/settings';
-import { sectionBeats, songEndBeat, measureAt, type Section, type SongNote } from '../../core/song';
+import { notesIn, sectionBeats, songEndBeat, measureAt, type Section, type SongNote } from '../../core/song';
 import { applyPass, describeStep, LEARNED, requirement, type SongMode } from '../../core/song-learning';
 import { mergeWithNext, splitSection } from '../../core/song-sections';
 import { setXmlFingering } from '../../core/song-musicxml';
@@ -51,6 +51,7 @@ export class PlayerView {
   private infoEl: HTMLElement;
   private resultEl: HTMLElement;
   private statusEl: HTMLElement;
+  private fingeringNote: HTMLElement;
   private viewEl: HTMLElement;
   private fingerMenu: HTMLElement;
   private falling: FallingNotes;
@@ -87,12 +88,13 @@ export class PlayerView {
     this.infoEl = h('div.song-section-info');
     this.resultEl = h('p.song-result', { role: 'status', 'aria-live': 'polite' });
     this.statusEl = h('p.song-status.num');
+    this.fingeringNote = h('p.song-fingering-note.muted');
     this.fingerMenu = h('div.finger-menu', { hidden: true, role: 'menu', 'aria-label': 'Finger' });
     this.viewEl = h('div.song-view');
     this.el = h(
       'section.song-player',
       { 'aria-label': 'Song' },
-      h('div.song-controls', null, this.head, this.transport, this.sectionsEl, this.infoEl, h('div.song-lines', null, this.statusEl, this.resultEl)),
+      h('div.song-controls', null, this.head, this.transport, this.sectionsEl, this.infoEl, h('div.song-lines', null, this.statusEl, this.fingeringNote, this.resultEl)),
       this.viewEl,
     );
     this.falling.el.addEventListener('click', (e) => this.editFinger(e));
@@ -399,6 +401,7 @@ export class PlayerView {
     const musicXml = entry.song.musicXml && note.xmlIndex !== undefined ? setXmlFingering(entry.song.musicXml, note.xmlIndex, finger) : entry.song.musicXml;
     entry.song = await saveSong({ ...entry.song, data: { ...entry.song.data, notes }, musicXml });
     this.player?.setData(entry.song.data);
+    this.renderFingeringNote();
     this.resultEl.textContent = finger ? `Finger ${finger} saved.` : 'Finger cleared.';
     if (this.settings.view === 'notation' && musicXml) void this.notation.show(musicXml);
   }
@@ -465,11 +468,29 @@ export class PlayerView {
   }
 
   private renderAll(): void {
+    this.renderFingeringNote();
     this.renderHead();
     this.renderTransport();
     this.renderSections();
     this.renderInfo();
     this.renderView();
+  }
+
+  /** Without any fingering, "colour by finger" falls back to the hands: say so. */
+  private renderFingeringNote(): void {
+    const entry = this.entry;
+    const player = this.player;
+    if (!entry || !player || this.settings.colors !== 'finger') {
+      this.fingeringNote.textContent = '';
+      return;
+    }
+    const [start, end] = player.currentRange;
+    const fingered = (notes: SongNote[]) => notes.some((n) => n.finger !== null);
+    this.fingeringNote.textContent = !fingered(entry.song.data.notes)
+      ? 'No fingering in this score — colours show hands.'
+      : !fingered(notesIn(entry.song.data, start, end, player.activeHands))
+        ? 'No fingering in this section — colours show hands.'
+        : '';
   }
 
   private renderView(): void {

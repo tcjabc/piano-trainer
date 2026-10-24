@@ -22,6 +22,8 @@ export interface FallingStyle {
 
 /** Beats from the keyboard edge to the top of the view. */
 const VISIBLE_BEATS = 8;
+/** How much of a hand-coloured note's core keeps its colour (the visualiser's is mostly white). */
+const HAND_CORE_TINT = 0.75;
 /** How long a judgement label stays under the note (ms). */
 const LABEL_MS = 700;
 
@@ -57,8 +59,8 @@ export class FallingNotes {
     const css = getComputedStyle(document.documentElement);
     const get = (name: string) => css.getPropertyValue(name).trim();
     this.colorsCss = {
-      left: get('--color-hand-left'),
-      right: get('--color-hand-right'),
+      left: get('--stage-hand-left'),
+      right: get('--stage-hand-right'),
       text: get('--stage-text') || '#f1f2f3',
       muted: get('--stage-text-muted') || '#888',
       fingers: [1, 2, 3, 4, 5].map((f) => get(`--finger-${f}`)),
@@ -74,10 +76,20 @@ export class FallingNotes {
     return note.hand === 'L' ? this.colorsCss.left : this.colorsCss.right;
   }
 
-  private spritesFor(color: string): Sprites {
-    let s = this.sprites.get(color);
-    if (!s) this.sprites.set(color, (s = renderSprites(color, this.tokens)));
+  /**
+   * Sprites per colour. Hand colours are neutral greys; drawn with a strongly
+   * tinted core (rather than the near-white one) so left and right stay apart.
+   */
+  private spritesFor(color: string, hand = false): Sprites {
+    const key = hand ? `${color}:hand` : color;
+    let s = this.sprites.get(key);
+    if (!s) this.sprites.set(key, (s = renderSprites(color, hand ? { ...this.tokens, coreTint: HAND_CORE_TINT } : this.tokens)));
     return s;
+  }
+
+  /** Whether a note is drawn in its hand's colour (no finger to colour it by). */
+  private byHand(note: SongNote, style: FallingStyle): boolean {
+    return style.colors === 'hand' || (style.colors === 'finger' && !note.finger);
   }
 
   /** The note drawn at a point (CSS px relative to the canvas), for editing its finger. */
@@ -149,7 +161,7 @@ export class FallingNotes {
       let alpha = active.includes(n.hand) ? 1 : other === 'play' ? 0.55 : 0.3;
       if (mark?.kind === 'missed') alpha *= 0.35;
       ctx.globalAlpha = alpha;
-      drawPill(ctx, this.tokens, this.spritesFor(this.colorFor(n, style)), x, Math.min(top, bottom - w), bottom, w);
+      drawPill(ctx, this.tokens, this.spritesFor(this.colorFor(n, style), this.byHand(n, style)), x, Math.min(top, bottom - w), bottom, w);
       this.hits.push({ note: n, x, top: Math.min(top, bottom - w), bottom, w });
     }
 

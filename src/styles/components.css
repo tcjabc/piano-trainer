@@ -2025,7 +2025,8 @@ select.control {
 
 .song-stats,
 .song-result,
-.song-status {
+.song-status,
+.song-fingering-note {
   margin: 0;
   font-size: var(--text-caption);
 }
@@ -2161,3 +2162,7 @@ select.control {
 .finger-choice[data-finger='3'] { color: var(--finger-3); border-color: var(--finger-3); }
 .finger-choice[data-finger='4'] { color: var(--finger-4); border-color: var(--finger-4); }
 .finger-choice[data-finger='5'] { color: var(--finger-5); border-color: var(--finger-5); }
+
+.song-fingering-note:empty {
+  display: none;
+}

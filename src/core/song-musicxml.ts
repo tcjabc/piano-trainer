@@ -161,15 +161,13 @@ export function parseMusicXml(xml: string): ParsedMusicXml {
               if (!ties.includes('start')) openTies.delete(tieKey);
               break;
             }
-            const fingering = el.getElementsByTagName('fingering')[0]?.textContent?.trim();
-            const finger = Number(fingering);
             const note: SongNote = {
               id: '',
               midi,
               beat: measureBeat + start,
               duration,
               hand,
-              finger: finger >= 1 && finger <= 5 ? (finger as Finger) : null,
+              finger: fingerOf(el),
               spelling: `${step}${alter > 0 ? '#'.repeat(alter) : 'b'.repeat(-alter)}${octave}`,
               velocity: DEFAULT_VELOCITY,
               xmlIndex: xmlIndex.get(el),
@@ -199,6 +197,24 @@ export function parseMusicXml(xml: string): ParsedMusicXml {
     composer,
     data: { notes, measures, tempos: dedupeTempos(tempos), timeSignature: timeSignature ?? [4, 4], key },
   };
+}
+
+/**
+ * A note's finger from <notations><technical><fingering> (where MuseScore,
+ * Finale, Sibelius and Dorico put it): the first digit 1–5, so a
+ * substitution such as "3-1" counts as 3. Other <fingering> elements (guitar
+ * frames) are ignored.
+ */
+function fingerOf(note: Element): Finger | null {
+  for (const notations of children(note, 'notations')) {
+    for (const technical of children(notations, 'technical')) {
+      for (const fingering of children(technical, 'fingering')) {
+        const m = /^\s*([1-5])/.exec(fingering.textContent ?? '');
+        if (m) return Number(m[1]) as Finger;
+      }
+    }
+  }
+  return null;
 }
 
 /** Tempo from a <direction>: its <sound tempo>, else a metronome mark. */

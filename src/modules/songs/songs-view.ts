@@ -288,8 +288,8 @@ function drawSplitPreview(canvas: HTMLCanvasElement, data: SongData, split: numb
   const end = Math.max(1, ...notes.map((n) => n.beat + n.duration));
   const y = (midi: number) => H - ((midi - lo) / (hi - lo)) * H;
   ctx.clearRect(0, 0, W, H);
-  const left = css.getPropertyValue('--color-hand-left').trim() || '#3ba5f7';
-  const right = css.getPropertyValue('--color-hand-right').trim() || '#e8ad3a';
+  const left = css.getPropertyValue('--color-hand-left').trim() || '#56657a';
+  const right = css.getPropertyValue('--color-hand-right').trim() || '#7d7466';
   const rowH = Math.max(1.5, H / (hi - lo) - 0.5);
   for (const n of notes) {
     ctx.fillStyle = n.hand === 'L' ? left : right;

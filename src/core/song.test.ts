@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs';
 import { Midi } from '@tonejs/midi';
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
@@ -67,6 +68,31 @@ describe('MusicXML import (bundled songs)', () => {
     const container = '<?xml version="1.0"?><container><rootfiles><rootfile full-path="score/ode.musicxml"/></rootfiles></container>';
     const zip = zipSync({ 'META-INF/container.xml': strToU8(container), 'score/ode.musicxml': strToU8(odeXml) });
     expect(parseMusicXml(unzipMxl(zip)).title).toBe('Ode to Joy');
+  });
+
+  it('reads fingering from a MuseScore .mxl export', () => {
+    // Ode to Joy exported by MuseScore Studio 4.7.5: score.xml in the zip, fingering inside
+    // <technical> with default-x/default-y, and MuseScore's own layout elements.
+    const bytes = readFileSync('src/core/__fixtures__/ode-to-joy.musescore.mxl');
+    const exported = parseMusicXml(unzipMxl(new Uint8Array(bytes)));
+    expect(exported.title).toBe('Ode to Joy');
+    const fingers = (d: SongData) => d.notes.map((n) => `${n.hand}${n.midi}@${n.beat}:${n.finger}`);
+    expect(fingers(exported.data)).toEqual(fingers(ode.data));
+    expect(exported.data.notes.every((n) => n.finger !== null)).toBe(true);
+  });
+
+  it('reads only technical fingering, taking the first finger of a substitution', () => {
+    const xml = odeXml
+      .replace('<fingering>3</fingering>', '<fingering substitution="yes" placement="above">3-1</fingering>')
+      .replace('<notations><technical><fingering>3</fingering></technical></notations>', '<notations><other-notation type="single">x</other-notation></notations>');
+    const notes = parseMusicXml(xml).data.notes.filter((n) => n.hand === 'R');
+    expect(notes[0]!.finger).toBe(3);
+    expect(notes[1]!.finger).toBeNull();
+    const frame = odeXml.replace(
+      '<notations><technical><fingering>3</fingering></technical></notations>',
+      '<notations><technical><fret>2</fret></technical></notations><notations><fingering>4</fingering></notations>',
+    );
+    expect(parseMusicXml(frame).data.notes.filter((n) => n.hand === 'R')[0]!.finger).toBeNull();
   });
 
   it('rejects files that are not MusicXML', () => {
