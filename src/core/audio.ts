@@ -96,12 +96,12 @@ export class PianoAudio extends Emitter<AudioEvents> {
 
   /**
    * Play notes for listening: together (stepMs 0, a block chord) or one after
-   * another (arpeggio, scale).
+   * another (arpeggio, scale), optionally starting `delayMs` from now.
    */
-  playNotes(notes: number[], { stepMs = 0, seconds = 1.4, velocity = 80 } = {}): void {
+  playNotes(notes: number[], { stepMs = 0, seconds = 1.4, velocity = 80, delayMs = 0 } = {}): void {
     if (!this.piano || !this.context) return;
     void this.context.resume();
-    const start = this.context.currentTime + 0.02;
+    const start = this.context.currentTime + 0.02 + delayMs / 1000;
     notes.forEach((note, i) => {
       this.piano!.start({ note, velocity, time: start + (i * stepMs) / 1000, duration: seconds });
     });

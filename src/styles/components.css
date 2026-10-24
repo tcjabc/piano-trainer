@@ -1593,3 +1593,100 @@ select.control {
   margin: 0;
   font-size: var(--text-caption);
 }
+
+/* ── Library: About (theory) and Compare ───────────────────────────────── */
+
+.library-about {
+  display: grid;
+  gap: var(--spacing-8);
+  max-width: var(--library-about-measure);
+  padding-top: var(--spacing-10);
+  border-top: var(--border-hairline) solid var(--color-border);
+}
+
+.library-about[open] {
+  padding-bottom: var(--spacing-5);
+}
+
+.library-about-title {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.library-about p {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: var(--leading);
+}
+
+/* Quieter than the explanation above it. */
+.library-about .library-heard {
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.library-compare-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-5);
+}
+
+.chip-button {
+  height: auto;
+  padding: var(--spacing-2) var(--spacing-8);
+  font-size: var(--text-caption);
+}
+
+.chip-button[aria-pressed='true'] {
+  border-color: var(--color-compare);
+  box-shadow: inset 0 0 0 var(--border-hairline) var(--color-compare);
+}
+
+/* One line of text that wraps naturally: swatch, which notes differ, Done. */
+.library-compare {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading);
+}
+
+.library-compare-swatch {
+  display: inline-block;
+  width: var(--spacing-10);
+  height: var(--spacing-10);
+  margin-right: var(--spacing-5);
+  border-radius: 50%;
+  background: var(--color-compare);
+}
+
+.library-compare .link-button {
+  margin-left: var(--spacing-10);
+}
+
+/* Keys that differ between the two items being compared. */
+.key.is-compare {
+  background: var(--color-compare-soft);
+  box-shadow: inset 0 calc(var(--border-divider) * -3) 0 var(--color-compare);
+}
+
+.key-black.is-compare {
+  background: var(--color-compare);
+}
+
+/* ── Study: theory reminder after a chord or scale card ─────────────────── */
+
+.staff-reminder {
+  margin: 0;
+  max-width: var(--library-about-measure);
+  font-size: var(--text-caption);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.staff-reminder:empty {
+  display: none;
+}

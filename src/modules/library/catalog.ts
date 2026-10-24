@@ -55,34 +55,40 @@ export function scaleItemId(tonic: string, type: ScaleType): string {
   return `scale:${tonic}:${type}`;
 }
 
+/** An item for any chord, listed or not (e.g. D♯ major, to compare with D♯ minor). */
+export function makeChordItem(spec: ChordSpec): ChordItem {
+  return {
+    kind: 'chord',
+    id: chordItemId(spec),
+    spec,
+    symbol: chordSymbol(spec),
+    name: chordName(spec),
+    formula: chordFormula(spec.quality),
+  };
+}
+
+export function makeScaleItem(tonic: string, type: ScaleType): ScaleItem {
+  return {
+    kind: 'scale',
+    id: scaleItemId(tonic, type),
+    tonic,
+    type,
+    name: `${tonic} ${scaleInfo(type).name}`,
+    formula: scaleFormula(tonic, type),
+  };
+}
+
 function buildCatalog(): LibraryItem[] {
   const items: LibraryItem[] = [];
   for (const q of CHORD_QUALITIES) {
     for (const root of chordRoots(q.id)) {
       for (let inversion = 0; inversion < inversionCount(q.id); inversion++) {
-        const spec: ChordSpec = { root, quality: q.id, inversion };
-        items.push({
-          kind: 'chord',
-          id: chordItemId(spec),
-          spec,
-          symbol: chordSymbol(spec),
-          name: chordName(spec),
-          formula: chordFormula(q.id),
-        });
+        items.push(makeChordItem({ root, quality: q.id, inversion }));
       }
     }
   }
   for (const t of SCALE_TYPES) {
-    for (const tonic of scaleRoots(t.id)) {
-      items.push({
-        kind: 'scale',
-        id: scaleItemId(tonic, t.id),
-        tonic,
-        type: t.id,
-        name: `${tonic} ${t.name}`,
-        formula: scaleFormula(tonic, t.id),
-      });
-    }
+    for (const tonic of scaleRoots(t.id)) items.push(makeScaleItem(tonic, t.id));
   }
   return items;
 }

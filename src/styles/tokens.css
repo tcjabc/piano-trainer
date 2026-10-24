@@ -60,6 +60,9 @@
   --color-correct-soft: #d8eee0;
   --color-wrong: #c2412d;
   --color-wrong-soft: #f6dcd6;
+  /* Notes that differ when comparing two chords or scales (Library). */
+  --color-compare: #5f7d00;
+  --color-compare-soft: #e6efc4;
   --color-on-functional: var(--neutral-pure-white);
 
   /*
@@ -197,6 +200,8 @@
   --play-card-max-width: 960px;
   --library-sidebar-width: 260px;
   --library-staff-min-height: 180px;
+  /* Comfortable line length for the theory notes. */
+  --library-about-measure: 62ch;
   --metronome-pill-height: 28px;
   --metronome-dot-size: 6px;
   --metronome-dot-size-first: 8px;
@@ -251,6 +256,8 @@
     --color-correct-soft: #173a27;
     --color-wrong: #e8735e;
     --color-wrong-soft: #45201a;
+    --color-compare: #c5e352;
+    --color-compare-soft: #2f3a10;
     --color-on-functional: var(--neutral-carbon-black);
 
     --finger-1: #e8ad3a;
@@ -290,6 +297,8 @@
   --color-correct-soft: #173a27;
   --color-wrong: #e8735e;
   --color-wrong-soft: #45201a;
+  --color-compare: #c5e352;
+  --color-compare-soft: #2f3a10;
   --color-on-functional: var(--neutral-carbon-black);
 
   --finger-1: #e8ad3a;

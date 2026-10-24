@@ -221,6 +221,14 @@ export class SettingsView {
           form.numberInput(s.scaleDrill.newPerDay, 0, 30, (v) => this.commit((x) => (x.scaleDrill.newPerDay = v))),
         ),
         form.field(
+          'Theory reminders',
+          form.checkbox(
+            s.theoryReminders,
+            (v) => this.commit((x) => (x.theoryReminders = v)),
+            'After a chord or scale card, show a line about what it is',
+          ),
+        ),
+        form.field(
           'Scale cards',
           form.segmented<'up' | 'updown'>(
             'scale-direction',

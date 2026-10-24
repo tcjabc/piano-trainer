@@ -88,6 +88,8 @@ export interface LibrarySettings {
   selected: string | null;
   /** Scales are shown, heard and added over this many octaves. */
   octaves: 1 | 2;
+  /** The detail panel's About section is open. */
+  aboutOpen: boolean;
 }
 
 export interface Settings {
@@ -112,6 +114,8 @@ export interface Settings {
   scaleDrill: ScaleDrillSettings;
   /** The starter decks have been offered (once; they can be deleted). */
   starterDecksAdded: boolean;
+  /** After a chord or scale card in Study, a one-line reminder of what it is. */
+  theoryReminders: boolean;
   metronome: MetronomeSettings;
 }
 
@@ -146,10 +150,11 @@ export const DEFAULT_SETTINGS: Settings = {
     scales: { ...EMPTY_FILTER, kinds: ['scale'], scaleTypes: ['major'], roots: ['C', 'G', 'F'] },
     octaves: 1,
   },
-  library: { filter: EMPTY_FILTER, selected: null, octaves: 1 },
+  library: { filter: EMPTY_FILTER, selected: null, octaves: 1, aboutOpen: true },
   chordDrill: { newPerDay: 5, showStaff: false },
   scaleDrill: { newPerDay: 3, direction: 'up' },
   starterDecksAdded: false,
+  theoryReminders: false,
   metronome: DEFAULT_METRONOME,
 };
 

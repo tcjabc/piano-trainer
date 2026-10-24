@@ -5,6 +5,7 @@
  */
 import {
   Accidental,
+  BarNote,
   Formatter,
   FretHandFinger,
   Modifier,
@@ -25,6 +26,10 @@ export interface NotationNote {
   spellings: string[];
   /** Optional finger number per spelling (same order); drawn in the finger colours. */
   fingers?: (Finger | null)[];
+  /** Spellings to mark (same order), e.g. the notes that differ in a comparison. */
+  marked?: boolean[];
+  /** Draw a barline before this note (e.g. between two things being compared). */
+  barBefore?: boolean;
 }
 
 /** A finger number wrapped in a group tagged with the finger, so CSS can colour it from --finger-N. */
@@ -74,7 +79,7 @@ function vexKey(spelling: string): { key: string; accidental: string } {
   return { key: `${s.letter.toLowerCase()}${s.accidental}/${s.octave}`, accidental: s.accidental };
 }
 
-function makeNote(note: NotationNote): StaveNote {
+function makeNote(note: NotationNote, markColor: string): StaveNote {
   // Work low to high so key indices match VexFlow's pitch order.
   const order = note.spellings.map((_, i) => i).sort((a, b) => spellingToMidi(note.spellings[a]!) - spellingToMidi(note.spellings[b]!));
   const keys = order.map((i) => vexKey(note.spellings[i]!));
@@ -82,6 +87,7 @@ function makeNote(note: NotationNote): StaveNote {
   const staveNote = new StaveNote({ clef: note.clef, keys: keys.map((k) => k.key), duration: 'w' });
   keys.forEach((k, i) => {
     if (k.accidental) staveNote.addModifier(new Accidental(k.accidental), i);
+    if (note.marked?.[order[i]!]) staveNote.setKeyStyle(i, { fillStyle: markColor, strokeStyle: markColor });
   });
   addFingering(staveNote, note.clef, fingers);
   return staveNote;
@@ -152,13 +158,15 @@ export function drawStaff(
     new StaveConnector(staves.treble, staves.bass).setType('singleLeft').setContext(ctx).draw();
   }
 
+  // Marked notes take the --color-compare token (SVG attributes can't read CSS variables).
+  const markColor = getComputedStyle(container).getPropertyValue('--color-compare').trim() || 'currentColor';
   for (const clef of ['treble', 'bass'] as const) {
     const stave = staves[clef];
     const forClef = notes.filter((n) => n.clef === clef);
     if (!stave || forClef.length === 0) continue;
-    const staveNotes = forClef.map(makeNote);
+    const staveNotes = forClef.map((n) => makeNote(n, markColor));
     const voice = new Voice({ numBeats: 4, beatValue: 4 }).setStrict(false);
-    voice.addTickables(staveNotes);
+    voice.addTickables(forClef.flatMap((n, i) => (n.barBefore ? [new BarNote(), staveNotes[i]!] : [staveNotes[i]!])));
     new Formatter().joinVoices([voice]).formatToStave([voice], stave);
     centreSingleNote(staveNotes, stave);
     voice.draw(ctx, stave);

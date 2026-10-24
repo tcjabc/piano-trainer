@@ -43,21 +43,22 @@ const ACCIDENTALS: Record<string, Accidental> = {
  * Either a note letter (at the start or after a non-letter, so words like
  * "Bob" are left alone) followed by an accidental, written in ASCII or
  * Unicode; or an altered extension in a chord symbol: ♭5 ♯5 ♭9 ♯9 ♯11 ♭13
- * after a digit or a bracket ("m7b5", "7#9", "7(b13)").
+ * after a digit or a bracket ("m7b5", "7#9", "7(b13)"); or a scale degree
+ * in prose, written with Unicode ♭/♯ ("a ♭3", "1–♭3–5").
  */
 const NOTE_ACCIDENTAL =
-  /(^|[^A-Za-z])([A-G])(##|bb|\u{1D12A}|\u{1D12B}|#|♯|b|♭|♮)|([0-9(])(#|♯|b|♭)(?=(?:5|9|11|13)(?![0-9]))/gu;
+  /(^|[^A-Za-z])([A-G])(##|bb|\u{1D12A}|\u{1D12B}|#|♯|b|♭|♮)|([0-9(])(#|♯|b|♭)(?=(?:5|9|11|13)(?![0-9]))|(?<![A-Za-z0-9])(♭|♯)(?=[1-9])/gu;
 
 /** Split text into plain runs and accidentals: "Bb7/F#" → ["B", flat, "7/F", sharp]. */
 export function splitNoteText(text: string): (string | { accidental: Accidental })[] {
   const parts: (string | { accidental: Accidental })[] = [];
   let last = 0;
   for (const match of text.matchAll(NOTE_ACCIDENTAL)) {
-    const [, before, letter, written, extBefore, extWritten] = match;
-    // Kept before the glyph: the note letter, or the digit/bracket before an extension.
-    const kept = letter ?? extBefore!;
+    const [, before, letter, written, extBefore, extWritten, degree] = match;
+    // Kept before the glyph: the note letter, or the digit/bracket before an extension (nothing for a degree).
+    const kept = letter ?? extBefore ?? '';
     const start = match.index! + (letter ? before!.length : 0);
-    const accidental = written ?? extWritten!;
+    const accidental = written ?? extWritten ?? degree!;
     parts.push(text.slice(last, start) + kept, { accidental: ACCIDENTALS[accidental]! });
     last = start + kept.length + accidental.length;
   }

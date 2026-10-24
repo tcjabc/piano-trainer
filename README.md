@@ -26,7 +26,7 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | `npm run dev` | Vite dev server with hot reload |
 | `npm run build` | Typecheck, then build the production app into `dist/` (with service worker) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | Unit tests (Vitest): metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
+| `npm test` | Unit tests (Vitest): theory notes and templating, metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
 | `npm run typecheck` | TypeScript only |
 
 ## Using it
@@ -78,6 +78,7 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
 - **Thresholds:** all grading thresholds are in one config, `src/core/grading.ts`. Hearing the answer first (H) caps the grade at Hard. Failed cards come back later in the same session.
 - **New cards:** each kind has its own daily limit for new cards (Settings → Study; defaults notes 10, chords 5, scales 3), so adding a big deck never crowds out the rest. Due reviews are never limited. New notes start at middle C and work outwards; chords and scales come in the order you added them. C♯ and D♭ are separate note cards (different staff positions) answered by the same key.
 - **Identity:** a chord card is root + quality + inversion + hand; a scale card is tonic + type + hand + octaves.
+- **Theory reminders** (Settings → Study, off by default): after a chord or scale card, one line on what it is, e.g. "C minor — a root, a minor third (3 semitones) and a perfect fifth (7)". It stays in view while the next card is shown, so it never holds you up.
 
 | Key | Action |
 | --- | --- |
@@ -117,6 +118,13 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Spelling:** roots use key spelling, with both spellings offered where both are common (C♯/D♭ and F♯/G♭ major, D♯/E♭ minor). Chromatic scales are spelled with sharps (flats from flat tonics). The blues ♭5 is written ♯4 where it would need a double flat.
 - **Filters:** type, chord quality, inversion, scale type, root, hand and scale octaves. Search works within the filters; if they hide everything, the list offers to clear them.
 - **Detail panel:** the name, the formula as degrees (1–♭3–5), the notes, a grand staff sized to the panel, and the item's keys marked on the keyboard. Fingering is shown in the finger colours on the keys; scales also show it above (right hand) or below (left hand) each note. Chord fingering stays on the keys, since numbers stacked over a chord are too small to read.
+- **About** (under the formula, collapsible; remembered): a few lines of theory for the chord quality or scale type.
+  - It covers how it's built, why it's called that and how it differs from its neighbours, how it sounds and where it's used, and a few well-known pieces it's heard in.
+  - Note names are filled in for the current root: "In E♭: E♭–G–B♭", "E♭ Dorian uses the notes of D♭ major".
+  - The text is in one data file, `src/data/theory.ts`, written to be edited by hand.
+- **Compare** buttons (e.g. "vs minor" on a major chord, "vs natural minor" on harmonic minor) play the item and then the other one on the same root.
+  - The notes that differ are marked in lime on the staff (both shown, separated by a barline) and on the keys, with a line naming them.
+  - **Done**, or choosing another item, ends the comparison.
 - **Review:** whether the item is in review for the current hand, and when it's next due. "Remove from review" keeps the card's history, so adding it again picks up where it left off.
 - **Play along:** play the item on your keyboard and a quiet tick appears. Nothing is scored.
 - **Decks** (in the sidebar) are saved filters.
@@ -228,9 +236,10 @@ src/
     fingering.ts   finger colours 1–5 and hand markers
     pitch.ts       note names, MIDI numbers, ledger lines
     settings.ts    settings shape and defaults
+  data/theory.ts theory notes for each chord quality and scale type (hand-editable)
   modules/notes/ note cards, today's plan, free practice selection
   modules/drill/ the drill (one card at a time), tasks for notes/chords/scales, chord/scale checking, sources
-  modules/library/ catalog and search, Library view, decks, review status
+  modules/library/ catalog and search, Library view, decks, review status, theory templating and compare
   modules/play/  Play area: live staff and chord readout, chord detection, visualiser
   ui/            header (with the metronome pill), keyboard, hand legend, staff panel, Today, settings, hotkeys, app shell
   assets/        hand-right.svg (modified Vadivam "hand" icon)

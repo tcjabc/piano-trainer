@@ -15,6 +15,7 @@ export class StaffView {
   private drawing: HTMLElement;
   private caption: HTMLElement;
   private corner: HTMLElement;
+  private reminder: HTMLElement;
 
   constructor() {
     this.title = h('p.staff-prompt');
@@ -22,6 +23,7 @@ export class StaffView {
     this.drawing = h('div.staff-drawing');
     this.caption = h('p.staff-caption', { 'aria-live': 'polite' });
     this.corner = h('span.staff-corner.num');
+    this.reminder = h('p.staff-reminder', { 'aria-live': 'polite' });
     this.el = h(
       'section.panel.staff-panel',
       { 'aria-label': 'Drill' },
@@ -29,7 +31,13 @@ export class StaffView {
       h('div.staff-prompt-block', null, this.title, this.subtitle),
       this.drawing,
       this.caption,
+      this.reminder,
     );
+  }
+
+  /** A line about the card just answered; it stays while the next card is shown. */
+  setReminder(text: string): void {
+    setNoteText(this.reminder, text);
   }
 
   /** A note card: just the staff. */

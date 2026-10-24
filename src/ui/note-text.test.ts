@@ -36,6 +36,14 @@ describe('splitNoteText', () => {
     expect(splitNoteText('Cb5 and Ab9')).toEqual(['C', { accidental: 'flat' }, '5 and A', { accidental: 'flat' }, '9']);
   });
 
+  it('formats scale degrees written with ♭ and ♯ in prose', () => {
+    const flat = { accidental: 'flat' };
+    expect(splitNoteText('1–♭3–4–♭5')).toEqual(['1–', flat, '3–4–', flat, '5']);
+    expect(splitNoteText('a ♯4 and a ♭13')).toEqual(['a ', { accidental: 'sharp' }, '4 and a ', flat, '13']);
+    // ASCII b/# before a lone digit stays text ("b3" could be anything in prose).
+    expect(splitNoteText('a b3 here')).toEqual(['a b3 here']);
+  });
+
   it('leaves ordinary words alone', () => {
     expect(splitNoteText('That was not it — play Ab4')).toEqual(['That was not it — play A', { accidental: 'flat' }, '4']);
     expect(splitNoteText('Bob Bach Debug')).toEqual(['Bob Bach Debug']);

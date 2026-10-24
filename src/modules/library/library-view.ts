@@ -1,12 +1,13 @@
 /**
  * Library area: a filter sidebar and search, the matching chords and scales,
- * and a detail panel (staff, keyboard highlight, name, formula). H hears the
- * item, A plays a chord as an arpeggio. Playing the item on the keyboard
- * shows a quiet tick; nothing is scored.
+ * and a detail panel (staff, keyboard highlight, name, formula, and an
+ * About section on the theory, with comparisons). H hears the item, A plays
+ * a chord as an arpeggio. Playing the item on the keyboard shows a quiet
+ * tick; nothing is scored.
  */
-import { CHORD_QUALITIES, INVERSION_NAMES, chordNotes, type ChordQuality } from '../../core/chords';
+import { CHORD_QUALITIES, INVERSION_NAMES, chordNotes, pitchClass, type ChordQuality } from '../../core/chords';
 import { audio } from '../../core/audio';
-import { drawStaff, GRAND_STAFF_HEIGHT, STAVE_MARGIN } from '../../core/notation';
+import { drawStaff, GRAND_STAFF_HEIGHT, STAVE_MARGIN, type NotationNote } from '../../core/notation';
 import { SCALE_TYPES, scaleInfo, scaleNotes, type ScaleType } from '../../core/scales';
 import type { HandChoice, LibrarySettings } from '../../core/settings';
 import { h, icon } from '../../ui/dom';
@@ -15,6 +16,7 @@ import { chipGroup, toggled } from '../../ui/chips';
 import { formatDegrees, formatNoteName } from '../../ui/note-text';
 import { checkChord, ScaleTracker } from '../drill/check';
 import { ALL_ROOTS, EMPTY_FILTER, filterItems, itemById, QUALITY_LABELS, type ItemKind, type LibraryFilter, type LibraryItem } from './catalog';
+import { notesNotIn, theoryFor } from './theory';
 import { chordTarget, fingers, itemKeys, notation, scaleReference, voicings } from './voicing';
 
 export interface LibraryActions {
@@ -29,6 +31,10 @@ const SEARCH_EXAMPLES = 'F#m7, Bb maj7 1st inv, C/E, D dorian, half diminished';
 const MIN_STAVE_WIDTH = 200;
 const MAX_STAVE_WIDTH = 900;
 const STAVE_WIDTH_PER_NOTE = 38;
+/** Compare: the gap between the two items when heard (ms). */
+const COMPARE_GAP_MS = 500;
+const CHORD_COMPARE_MS = 1300;
+const SCALE_STEP_MS = 180;
 
 export class LibraryView {
   readonly el: HTMLElement;
@@ -54,6 +60,8 @@ export class LibraryView {
   /** The detail panel's staff; redrawn when its box changes shape. */
   private drawing: HTMLElement | null = null;
   private staveWidth = 0;
+  /** Comparing the selected item with another (same root): what it is and its label. */
+  private comparing: { other: LibraryItem; label: string } | null = null;
   private tickTimer = 0;
   private tracker: ScaleTracker | null = null;
   private showFingering = true;
@@ -151,6 +159,7 @@ export class LibraryView {
 
   setHand(hand: HandChoice): void {
     this.hand = hand;
+    this.comparing = null;
     this.renderFilters();
     this.renderDetail();
   }
@@ -265,7 +274,10 @@ export class LibraryView {
 
   private refresh(): void {
     this.results = filterItems(this.settings.filter, this.query);
-    if (!this.selected || !this.results.includes(this.selected)) this.selected = this.results[0] ?? null;
+    if (!this.selected || !this.results.includes(this.selected)) {
+      this.selected = this.results[0] ?? null;
+      this.comparing = null;
+    }
     this.renderList();
     this.renderDetail();
   }
@@ -274,6 +286,7 @@ export class LibraryView {
     const item = this.results.find((i) => i.id === id) ?? itemById(id) ?? null;
     if (!item || item === this.selected) return;
     this.selected = item;
+    this.comparing = null;
     this.settings.selected = item.id;
     this.tracker = null;
     this.actions.change(structuredClone(this.settings));
@@ -343,6 +356,8 @@ export class LibraryView {
             h('dt', null, 'Notes'),
             h('dd', null, formatNoteName(notes.join('  '))),
           ),
+          this.aboutSection(item),
+          this.compareNote(item),
         ),
       ),
       this.drawing,
@@ -366,8 +381,131 @@ export class LibraryView {
     this.drawStaff();
     if (this.active) {
       this.keyboard.setHighlights(itemKeys(item, this.hand, octaves));
+      this.keyboard.setMarked(this.comparing ? this.differingKeys(item, this.comparing.other) : []);
       this.showFingersOnKeys(item);
     }
+  }
+
+  /** What it is, why it's called that, how it sounds, where it's heard; and comparisons. */
+  private aboutSection(item: LibraryItem): HTMLElement {
+    const t = theoryFor(item);
+    const about = h(
+      'details.library-about',
+      { open: this.settings.aboutOpen },
+      h('summary.library-about-title', null, 'About'),
+      h('p', null, formatNoteName(t.built)),
+      h('p', null, formatNoteName(t.name)),
+      h('p', null, formatNoteName(t.sound)),
+      t.heardIn.length
+        ? h('p.library-heard', null, 'Heard in ', t.heardIn.map((x) => `“${x.title}” (${x.artist})`).join(', '))
+        : null,
+      t.compare.length
+        ? h(
+            'div.library-compare-buttons',
+            null,
+            ...t.compare.map((c) =>
+              h(
+                'button.button-outline.chip-button',
+                {
+                  type: 'button',
+                  title: `Hear ${item.name}, then ${c.item.name}, and mark the notes that differ`,
+                  'aria-pressed': String(this.comparing?.other.id === c.item.id),
+                  onclick: () => this.compare(c.item, c.label),
+                },
+                formatNoteName(c.label),
+              ),
+            ),
+          )
+        : null,
+    );
+    about.addEventListener('toggle', () => {
+      if (about.open === this.settings.aboutOpen) return;
+      this.settings.aboutOpen = about.open;
+      this.actions.change(structuredClone(this.settings));
+    });
+    return about;
+  }
+
+  /** While comparing: which notes differ, and a way back. */
+  private compareNote(item: LibraryItem): HTMLElement | null {
+    const c = this.comparing;
+    if (!c) return null;
+    const onlyA = notesNotIn(item, c.other);
+    const onlyB = notesNotIn(c.other, item);
+    const list = (name: string, notes: string[]) => `${name}: ${notes.length ? notes.join(' ') : 'nothing extra'}`;
+    return h(
+      'p.library-compare',
+      { role: 'status' },
+      h('span.library-compare-swatch', { 'aria-hidden': 'true' }),
+      h('span', null, formatNoteName(`Only in ${list(item.name, onlyA)} · only in ${list(c.other.name, onlyB)}`)),
+      h('button.link-button', { type: 'button', onclick: () => this.endCompare() }, 'Done'),
+    );
+  }
+
+  /** Hear the item, then the other one, with the notes that differ marked on the staff and keys. */
+  compare(other: LibraryItem, label: string): void {
+    const item = this.selected;
+    if (!item) return;
+    this.comparing = { other, label };
+    this.renderDetail();
+    // On a short screen the About text can push the staff out of view.
+    this.drawing?.scrollIntoView({ block: 'nearest' });
+    const first = this.heardNotes(item);
+    const firstMs = item.kind === 'chord' ? CHORD_COMPARE_MS : first.length * SCALE_STEP_MS;
+    const play = (notes: number[], delayMs: number) =>
+      item.kind === 'chord'
+        ? audio.playNotes(notes, { seconds: 1.2, delayMs })
+        : audio.playNotes(notes, { stepMs: SCALE_STEP_MS, seconds: 0.4, delayMs });
+    play(first, 0);
+    play(this.heardNotes(other), firstMs + COMPARE_GAP_MS);
+  }
+
+  private endCompare(): void {
+    this.comparing = null;
+    this.renderDetail();
+  }
+
+  /** What compare plays: a chord as a block, a scale ascending (in the left hand's octave for the left hand). */
+  private heardNotes(item: LibraryItem): number[] {
+    if (item.kind === 'chord') return itemKeys(item, this.hand, 1).sort((a, b) => a - b);
+    const shift = this.hand === 'left' ? -12 : 0;
+    return scaleReference(item, this.settings.octaves, 'up').map((n) => n + shift);
+  }
+
+  /** Keys of either item whose pitch class the other lacks. */
+  private differingKeys(a: LibraryItem, b: LibraryItem): number[] {
+    const octaves = this.settings.octaves;
+    const pcsA = new Set(itemKeys(a, this.hand, octaves).map(pitchClass));
+    const pcsB = new Set(itemKeys(b, this.hand, octaves).map(pitchClass));
+    return [
+      ...itemKeys(a, this.hand, octaves).filter((k) => !pcsB.has(pitchClass(k))),
+      ...itemKeys(b, this.hand, octaves).filter((k) => !pcsA.has(pitchClass(k))),
+    ];
+  }
+
+  /**
+   * The staff: the item (with fingering, when shown), or while comparing,
+   * the item then the other after a barline, with the notes that differ marked.
+   */
+  private staffNotes(): NotationNote[] {
+    const item = this.selected!;
+    const octaves = this.settings.octaves;
+    const c = this.comparing;
+    if (!c) return notation(item, this.hand, octaves, this.fingersFor(item));
+    const mark = (notes: NotationNote[], differs: Set<number>, bar: boolean): NotationNote[] => {
+      const seen = new Set<string>();
+      return notes.map((n) => {
+        const first = !seen.has(n.clef);
+        seen.add(n.clef);
+        return { ...n, marked: n.spellings.map((s) => differs.has(pitchClass(s))), barBefore: bar && first };
+      });
+    };
+    const pcs = (i: LibraryItem) => new Set(itemKeys(i, this.hand, octaves).map(pitchClass));
+    const a = pcs(item);
+    const b = pcs(c.other);
+    const onlyA = new Set([...a].filter((pc) => !b.has(pc)));
+    const onlyB = new Set([...b].filter((pc) => !a.has(pc)));
+    return [...mark(notation(item, this.hand, octaves), onlyA, false), ...mark(notation(c.other, this.hand, octaves), onlyB, true)];
   }
 
   /** Draw the selected item's staff, shaped to fill the box it has. */
@@ -375,9 +513,7 @@ export class LibraryView {
     const item = this.selected;
     if (!item || !this.drawing) return;
     this.staveWidth = this.fittedStaveWidth();
-    drawStaff(this.drawing, 'grand', notation(item, this.hand, this.settings.octaves, this.fingersFor(item)), {
-      staveWidth: this.staveWidth,
-    });
+    drawStaff(this.drawing, 'grand', this.staffNotes(), { staveWidth: this.staveWidth });
   }
 
   /**
@@ -387,7 +523,8 @@ export class LibraryView {
   private fittedStaveWidth(): number {
     const item = this.selected;
     if (!item || !this.drawing) return 0;
-    const count = item.kind === 'chord' ? 1 : notation(item, 'right', this.settings.octaves).length;
+    const notes = this.staffNotes();
+    const count = Math.max(...(['treble', 'bass'] as const).map((clef) => notes.filter((n) => n.clef === clef).length));
     const needed = Math.max(MIN_STAVE_WIDTH, 70 + count * STAVE_WIDTH_PER_NOTE);
     const { clientWidth: w, clientHeight: hgt } = this.drawing;
     const fitted = w > 0 && hgt > 0 ? (w / hgt) * GRAND_STAFF_HEIGHT - STAVE_MARGIN : needed;

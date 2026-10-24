@@ -22,7 +22,8 @@ import { MAX_BPM, MIN_BPM } from '../core/metronome';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
 import { Drill } from '../modules/drill/drill';
-import { itemContent, noteItem, type DrillItem, type DrillOptions } from '../modules/drill/items';
+import { itemContent, libraryItemFor, noteItem, type DrillItem, type DrillOptions } from '../modules/drill/items';
+import { theoryFor } from '../modules/library/theory';
 import { FreeSource, ReviewSource } from '../modules/drill/sources';
 import { HAND_LABELS } from '../modules/drill/tasks';
 import { freeContents, freeRange, staffForHand } from '../modules/notes/free';
@@ -121,6 +122,7 @@ export class App {
     });
     this.drill = new Drill(this.staff, this.keyboard, {
       finished: () => this.show(this.drillReturn),
+      answered: (item) => this.theoryReminder(item),
     });
     this.library = new LibraryView(
       settings.library,
@@ -327,6 +329,13 @@ export class App {
         this.visualiser.pulse(beat.level === 'accent' ? 1 : 0.5);
       }
     });
+  }
+
+  /** After a chord or scale card (when switched on): one line on what it is, kept while the next card shows. */
+  private theoryReminder(item: DrillItem): void {
+    if (!this.settings.theoryReminders) return;
+    const lib = libraryItemFor(item);
+    if (lib) this.staff.setReminder(`${lib.name} — ${theoryFor(lib).short}`);
   }
 
   /** Push the current settings to every part of the UI. */
@@ -536,6 +545,7 @@ export class App {
     this.drillReturn = 'today';
     this.show('drill');
     const clef = noteDrillOptions(this.settings).clef;
+    this.staff.setReminder('');
     this.drill.start(
       new ReviewSource(cards, clef === 'both' ? 'grand' : clef, { ahead }, () => void this.refreshSummary()),
       this.drillOptions(),
@@ -590,6 +600,7 @@ export class App {
     this.drillKind = 'free';
     this.drillReturn = from;
     this.show('drill');
+    this.staff.setReminder('');
     this.drill.start(new FreeSource(items, noteStaff), this.drillOptions());
   }
 

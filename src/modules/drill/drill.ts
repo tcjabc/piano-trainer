@@ -14,6 +14,8 @@ import { baseTasks, type Task, type TaskFactory, type TaskHost } from './tasks';
 export interface DrillHooks {
   /** The source ran out of cards. */
   finished: () => void;
+  /** A card was answered (played correctly, or a scale finished). */
+  answered?: (item: DrillItem) => void;
 }
 
 type Phase = 'answering' | 'advancing' | 'paused' | 'stopped';
@@ -157,7 +159,10 @@ export class Drill {
       self.graded = true;
       void self.source.record(self.item, o, self.hinted);
     },
-    complete: () => self.advance(),
+    complete: () => {
+      if (self.item) self.hooks.answered?.(self.item);
+      self.advance();
+    },
   }))(this);
 
   private advance(): void {
