@@ -34,6 +34,10 @@ export type ActionId =
   | 'tap-tempo'
   | 'tempo-up'
   | 'tempo-down'
+  | 'loop-a'
+  | 'loop-b'
+  | 'song-view'
+  | 'song-wait'
   | 'zoom'
   | 'tempo';
 
@@ -68,6 +72,10 @@ export const ACTIONS: readonly ActionInfo[] = [
   { id: 'tap-tempo', label: 'Tap tempo', hotkey: 'B' },
   { id: 'tempo-up', label: 'Tempo +1', hotkey: '.' },
   { id: 'tempo-down', label: 'Tempo −1', hotkey: ',' },
+  { id: 'loop-a', label: 'Song: loop start (A)', hotkey: '[' },
+  { id: 'loop-b', label: 'Song: loop end (B)', hotkey: ']' },
+  { id: 'song-view', label: 'Song: falling notes / notation', hotkey: 'V' },
+  { id: 'song-wait', label: 'Song: wait mode / play-along', hotkey: 'W' },
   { id: 'zoom', label: 'Keyboard zoom (knob)', continuous: true },
   { id: 'tempo', label: 'Tempo (knob)', continuous: true },
 ];

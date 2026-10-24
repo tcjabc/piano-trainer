@@ -13,8 +13,9 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
-    // VexFlow (with its embedded Bravura font) and smplr make one large chunk; that is expected.
-    chunkSizeWarningLimit: 1200,
+    // VexFlow (with its embedded Bravura font) and smplr make one large chunk; OpenSheetMusicDisplay
+    // is its own chunk, loaded only when a song's score is first shown. Both are expected.
+    chunkSizeWarningLimit: 1400,
   },
   plugins: [
     vadivamIcons(),

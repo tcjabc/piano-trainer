@@ -66,6 +66,9 @@
   /* Hands in songs (falling notes, the split preview). */
   --color-hand-left: #1f6fd1;
   --color-hand-right: #c25a12;
+  /* Printed music (the song score) is dark on paper in both themes. */
+  --color-paper: #ffffff;
+  --color-paper-ink: #111111;
   --color-on-functional: var(--neutral-pure-white);
 
   /*
@@ -209,6 +212,8 @@
   --section-pip-width: 18px;
   --section-pip-height: 8px;
   --split-preview-height: 180px;
+  --song-tempo-slider-width: 140px;
+  --song-options-width: 340px;
   --metronome-pill-height: 28px;
   --metronome-dot-size: 6px;
   --metronome-dot-size-first: 8px;

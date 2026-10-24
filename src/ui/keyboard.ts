@@ -201,13 +201,13 @@ export class Keyboard extends Emitter<KeyboardEvents> {
     this.setTargets(note === null ? [] : [note]);
   }
 
-  /** Mark several keys that should be played (a chord's missing notes). */
   /** Keys marked in a comparison (the notes that differ). */
   setMarked(notes: Iterable<number>): void {
     for (const key of this.track.querySelectorAll('.is-compare')) key.classList.remove('is-compare');
     for (const note of notes) this.keys.get(note)?.classList.add('is-compare');
   }
 
+  /** Mark several keys that should be played (a chord's missing notes). */
   setTargets(notes: Iterable<number>): void {
     for (const key of this.track.querySelectorAll('.is-target')) key.classList.remove('is-target');
     for (const note of notes) this.keys.get(note)?.classList.add('is-target');

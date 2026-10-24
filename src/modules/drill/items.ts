@@ -13,6 +13,7 @@ import {
   type NoteCardContent,
   type ScaleCard,
   type ScaleCardContent,
+  type SongCard,
   type SongCardContent,
 } from '../../core/storage';
 import { cardKey as noteCardKey } from '../notes/cards';
@@ -67,6 +68,14 @@ export function newChordCard(content: ChordCardContent, now: number): ChordCard 
 
 export function newScaleCard(content: ScaleCardContent, now: number): ScaleCard {
   return { id: uuid(), key: scaleCardKey(content), module: 'scales', content, fsrs: newFsrsState(now), createdAt: now, updatedAt: now };
+}
+
+export function songCardKey(c: SongCardContent): string {
+  return `songs:${c.songId}:${c.sectionId}`;
+}
+
+export function newSongCard(content: SongCardContent, now: number): SongCard {
+  return { id: uuid(), key: songCardKey(content), module: 'songs', content, fsrs: newFsrsState(now), createdAt: now, updatedAt: now };
 }
 
 /** A card as a drill item (cards already carry their id, module and content). */

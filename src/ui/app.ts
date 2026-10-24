@@ -22,7 +22,7 @@ import { MAX_BPM, MIN_BPM } from '../core/metronome';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
 import { Drill } from '../modules/drill/drill';
-import { itemContent, libraryItemFor, noteItem, type DrillItem, type DrillOptions } from '../modules/drill/items';
+import { itemContent, libraryItemFor, newSongCard, noteItem, songCardKey, type DrillItem, type DrillOptions } from '../modules/drill/items';
 import { theoryFor } from '../modules/library/theory';
 import { FreeSource, ReviewSource } from '../modules/drill/sources';
 import { HAND_LABELS } from '../modules/drill/tasks';
@@ -33,7 +33,8 @@ import { DecksPanel } from '../modules/library/decks-view';
 import { LibraryView } from '../modules/library/library-view';
 import { relativeDue, ReviewIndex } from '../modules/library/review-index';
 import { PlayView } from '../modules/play/play-view';
-import { addBundledSongs } from '../modules/songs/song-store';
+import { PlayerView } from '../modules/songs/player-view';
+import { addBundledSongs, loadSong } from '../modules/songs/song-store';
 import { SongsView } from '../modules/songs/songs-view';
 import { Visualiser } from '../modules/play/visualiser';
 import { h, icon } from './dom';
@@ -51,7 +52,7 @@ import { TodayView } from './today';
 import { UpdateToast } from './update-toast';
 import { ZoomControl } from './zoom-control';
 
-type Screen = 'play' | 'today' | 'free' | 'drill' | 'library' | 'songs' | 'settings';
+type Screen = 'play' | 'today' | 'free' | 'drill' | 'library' | 'songs' | 'song' | 'settings';
 
 /** Library items that can be added to review and drilled. */
 const REVIEWABLE: ReadonlySet<ItemKind> = new Set(['chord', 'scale']);
@@ -112,7 +113,9 @@ export class App {
   private studyNav = new StudyNav((view) => this.show(view));
   private library: LibraryView;
   private libraryNav = new LibraryNav((tab) => this.showLibraryTab(tab));
-  private songs = new SongsView({ open: (id) => this.openSong(id) });
+  private songs = new SongsView({ open: (id) => void this.openSong(id) });
+  private player: PlayerView;
+  private songSaveTimer = 0;
   private librarySaveTimer = 0;
   private free: FreePracticeView;
 
@@ -152,6 +155,13 @@ export class App {
       progress: (deck) => this.deckProgress(deck),
     });
     this.library.setSidebarExtras(this.decksPanel.el);
+    this.player = new PlayerView(this.keyboard, {
+      back: () => this.showLibraryTab('songs'),
+      settingsChanged: (songs) => this.rememberSongSettings(songs),
+      setHand: (hand) => void this.setHand(hand),
+      reviewState: (songId, sectionId) => this.songReviewState(songId, sectionId),
+      toggleReview: (songId, sectionId) => this.toggleSongReview(songId, sectionId),
+    });
     this.free = new FreePracticeView(settings.freePractice, {
       change: (freePractice) => void this.patchSettings({ freePractice }),
       start: () => this.startFree(),
@@ -178,7 +188,10 @@ export class App {
     this.zoom.on('commit', (z) => void this.patchSettings({ keyboardZoom: z }));
     this.hands.on('change', (hand) => (this.inFreePractice ? this.setFreeHand(hand) : void this.setHand(hand)));
     this.wireControls();
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.visualiser.refreshTokens());
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      this.visualiser.refreshTokens();
+      this.player.refreshTokens();
+    });
     this.wireInput();
     this.show('play');
 
@@ -220,8 +233,35 @@ export class App {
     this.show(tab === 'songs' ? 'songs' : 'library');
   }
 
-  private openSong(_id: string): void {
-    // The song player arrives with the next feature.
+  private async openSong(id: string): Promise<void> {
+    const entry = await loadSong(id);
+    if (!entry) return;
+    const s = this.settings;
+    this.player.open(entry, s.songs, s.hand, s.visualiser.colors);
+    this.show('song');
+  }
+
+  /** Song player settings change often (tempo slider, progressive tempo); save them once they settle. */
+  private rememberSongSettings(songs: Settings['songs']): void {
+    this.settings = { ...this.settings, songs };
+    this.settingsView.setSettings(this.settings, false);
+    window.clearTimeout(this.songSaveTimer);
+    this.songSaveTimer = window.setTimeout(() => void storage.saveSettings(this.settings), KNOB_SAVE_DELAY_MS);
+  }
+
+  private async songReviewState(songId: string, sectionId: string): Promise<{ inReview: boolean; due: string | null }> {
+    const card = await storage.getCardByKey(songCardKey({ songId, sectionId }));
+    if (!card || card.suspended) return { inReview: false, due: null };
+    return { inReview: true, due: card.fsrs.state === 0 ? 'as a new card' : relativeDue(card.fsrs.due) };
+  }
+
+  /** Add a song section to review (a new card, or its old one back), or take it out (kept, suspended). */
+  private async toggleSongReview(songId: string, sectionId: string): Promise<void> {
+    const now = Date.now();
+    const card = await storage.getCardByKey(songCardKey({ songId, sectionId }));
+    if (!card) await storage.putCard(newSongCard({ songId, sectionId }, now));
+    else await storage.putCard({ ...card, suspended: !card.suspended, updatedAt: now });
+    void this.refreshSummary();
   }
 
   // ── Decks ────────────────────────────────────────────────────────────
@@ -304,7 +344,11 @@ export class App {
     controls.on('action', (action) => this.hotkeys.trigger(action));
     controls.on('continuous', ({ action, absolute, delta }) => {
       if (action === 'zoom') this.knobZoom(absolute ?? this.settings.keyboardZoom + (delta ?? 0) * KNOB_ZOOM_STEP);
-      if (action === 'tempo') {
+      if (action === 'tempo' && this.screen === 'song') {
+        // In a song the knob sets the song's tempo (25–150%; a relative knob moves 5% per step).
+        if (absolute !== undefined) this.player.setTempo(0.25 + absolute * 1.25);
+        else this.player.nudgeTempo(delta ?? 0);
+      } else if (action === 'tempo') {
         if (absolute !== undefined) metronome.setBpm(MIN_BPM + absolute * (MAX_BPM - MIN_BPM));
         else metronome.nudge((delta ?? 0) * KNOB_TEMPO_STEP);
       }
@@ -378,6 +422,8 @@ export class App {
     const s = this.settings;
     applyTheme(s.theme);
     this.visualiser.refreshTokens();
+    this.player.refreshTokens();
+    this.player.setPreset(s.visualiser.colors);
     this.visualiser.setMode(s.visualiser.colors);
     this.visualiser.setEmbers(s.visualiser.sparks);
     this.hands.set(this.inFreePractice ? s.freePractice.notes.hand : s.hand);
@@ -422,6 +468,7 @@ export class App {
       if (this.screen === 'drill') this.drill.noteOn(note, time, this.held);
       if (this.screen === 'free' && this.free.picking) this.free.toggleKey(note);
       if (this.screen === 'library') this.library.notePressed(note, this.held);
+      if (this.screen === 'song') this.player.noteOn(note, time);
     };
     const midiNoteOn = (note: number, velocity: number, time: number) => {
       // Scroll to keys played on the MIDI keyboard (on-screen presses are already in view).
@@ -461,9 +508,30 @@ export class App {
   /** Go to an area's home screen: Play, or Today for Study (a running review session stays). */
   private showArea(area: Area): void {
     if (area === 'play' && this.screen !== 'play') this.show('play');
-    if (area === 'library' && this.screen !== 'library' && this.screen !== 'songs') this.show(this.libraryScreen);
+    if (area === 'library' && this.screen !== 'library' && this.screen !== 'songs' && this.screen !== 'song') this.show(this.libraryScreen);
     const inReviews = this.screen === 'today' || (this.screen === 'drill' && this.drillKind === 'review');
     if (area === 'study' && !inReviews) this.show('today');
+  }
+
+  /** The song player's keys: transport, sections, loop, tempo, view and mode. */
+  private setSongHotkeys(): void {
+    const p = this.player;
+    this.hotkeys.set([
+      { keys: [' '], label: 'Space', hint: 'Play / pause', action: 'start-pause', run: () => p.togglePlay() },
+      { keys: ['r'], label: 'R', hint: 'Restart', action: 'restart', run: () => p.restart() },
+      { keys: ['ArrowRight'], label: '← →', hint: 'Section', action: 'next', run: () => p.stepSection(1) },
+      { keys: ['ArrowLeft'], label: '←', hint: '', hidden: true, action: 'previous', run: () => p.stepSection(-1) },
+      { keys: ['['], label: '[ ]', hint: 'Loop A / B', action: 'loop-a', run: () => p.setLoopPoint('a') },
+      { keys: [']'], label: ']', hint: '', hidden: true, action: 'loop-b', run: () => p.setLoopPoint('b') },
+      { keys: ['\\'], label: '\\', hint: '', hidden: true, run: () => p.clearLoop() },
+      { keys: [','], label: ', .', hint: 'Tempo', action: 'tempo-down', run: () => p.nudgeTempo(-1) },
+      { keys: ['.'], label: '.', hint: '', hidden: true, action: 'tempo-up', run: () => p.nudgeTempo(1) },
+      { keys: ['w'], label: 'W', hint: 'Wait / play-along', action: 'song-wait', optional: true, run: () => p.toggleWait() },
+      { keys: ['v'], label: 'V', hint: 'View', action: 'song-view', optional: true, run: () => p.toggleView() },
+      { keys: ['Escape'], label: 'Esc', hint: 'Songs', action: 'back', run: () => this.showLibraryTab('songs') },
+      ...this.handHotkeys(),
+      ...this.commonHotkeys(),
+    ]);
   }
 
   /** Library screens show the Chords & scales / Songs switch above their content. */
@@ -482,9 +550,10 @@ export class App {
     if (this.screen === 'drill' && screen !== 'drill') this.drill.stop();
     if (this.screen === 'settings' && screen !== 'settings') this.settingsView.stopLearning(null);
     if (this.screen === 'library' && screen !== 'library') this.library.deactivate();
+    if (this.screen === 'song' && screen !== 'song') this.player.deactivate();
     this.screen = screen;
     if (screen !== 'settings') {
-      const fromLibrary = screen === 'library' || screen === 'songs' || (screen === 'drill' && this.drillReturn === 'library');
+      const fromLibrary = screen === 'library' || screen === 'songs' || screen === 'song' || (screen === 'drill' && this.drillReturn === 'library');
       this.lastArea = screen === 'play' ? 'play' : fromLibrary ? 'library' : 'study';
     }
     if (screen === 'today' || screen === 'free') this.lastStudy = screen;
@@ -505,6 +574,10 @@ export class App {
       this.stage.replaceChildren(this.libraryStage('items', this.library.el));
       this.library.activate();
       this.setLibraryHotkeys();
+    } else if (screen === 'song') {
+      this.stage.replaceChildren(this.player.el);
+      this.player.activate();
+      this.setSongHotkeys();
     } else if (screen === 'songs') {
       this.stage.replaceChildren(this.libraryStage('songs', this.songs.el));
       void this.songs.refresh();
@@ -546,7 +619,7 @@ export class App {
     } else {
       const back: Screen = this.lastArea === 'study' ? this.lastStudy : this.lastArea === 'library' ? this.libraryScreen : this.lastArea;
       this.stage.replaceChildren(this.settingsView.el);
-      const backLabel = { play: 'Play', today: 'Today', free: 'Free practice', library: 'Library', songs: 'Songs' } as Record<string, string>;
+      const backLabel = { play: 'Play', today: 'Today', free: 'Free practice', library: 'Library', songs: 'Songs', song: 'Song' } as Record<string, string>;
       this.hotkeys.set([
         { keys: ['Escape'], label: 'Esc', hint: backLabel[back] ?? 'Back', action: 'back', run: () => this.show(back) },
         ...this.commonHotkeys(),
@@ -832,6 +905,7 @@ export class App {
     this.library.setHand(hand);
     this.library.refreshDetail();
     this.decksPanel.refresh();
+    this.player.setHand(hand);
     if (this.screen === 'drill' && this.drillKind === 'review' && !(await this.startDrill(this.drillAhead))) this.show('today');
   }
 
