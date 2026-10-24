@@ -5,6 +5,9 @@
  * while stopped). The keyboard always shows the next keys to play, with
  * finger numbers where they're known.
  *
+ * The hands played here are the player's own choice (it starts from the
+ * hand legend's), so practising a left-hand step never changes Study.
+ *
  * Also used, stripped down, for a section's review card in Study.
  */
 import type { Finger } from '../../core/fingering';
@@ -26,8 +29,8 @@ export interface PlayerActions {
   back: () => void;
   /** Settings changed here (view, mode, tempo, …), to be saved. */
   settingsChanged: (settings: SongSettings) => void;
-  /** Change the practised hand (the hand legend). */
-  setHand: (hand: HandChoice) => void;
+  /** The player's hand changed: show it on the hand legend (nothing is saved). */
+  handShown: (hand: HandChoice) => void;
   /** Whether a section is in review, and add/remove it. */
   reviewState: (songId: string, sectionId: string) => Promise<{ inReview: boolean; due: string | null }>;
   toggleReview: (songId: string, sectionId: string) => Promise<void>;
@@ -57,6 +60,10 @@ export class PlayerView {
   private entry: SongEntry | null = null;
   private settings!: SongSettings;
   private hand: HandChoice = 'right';
+  /** Hands chosen in the player this session; until then it starts from the hand legend's. */
+  private chosenHand: HandChoice | null = null;
+  /** Review card: the mode to go back to after hearing the section first (H). */
+  private previewing: SongMode | null = null;
   private preset: VisualiserColors = 'rainbow';
   private player: SongPlayer | null = null;
   /** Selected section id, or null for the whole song. */
@@ -98,6 +105,11 @@ export class PlayerView {
     return this.entry?.song.id ?? null;
   }
 
+  /** The hands being practised here. */
+  get currentHand(): HandChoice {
+    return this.hand;
+  }
+
   get playing(): boolean {
     return this.player?.phase === 'playing' || this.player?.phase === 'counting-in';
   }
@@ -107,7 +119,7 @@ export class PlayerView {
   /** Open a song for practice. */
   open(entry: SongEntry, settings: SongSettings, hand: HandChoice, preset: VisualiserColors): void {
     this.review = null;
-    this.load(entry, settings, hand, preset);
+    this.load(entry, settings, this.chosenHand ?? hand, preset);
     this.section = entry.song.sections[0]?.id ?? null;
     this.loopAB = { a: null, b: null };
     this.applyRange();
@@ -131,6 +143,7 @@ export class PlayerView {
 
   private load(entry: SongEntry, settings: SongSettings, hand: HandChoice, preset: VisualiserColors): void {
     this.player?.stop();
+    this.previewing = null;
     this.entry = entry;
     this.settings = { ...settings };
     if (!entry.song.musicXml && this.settings.view === 'notation') this.settings.view = 'falling';
@@ -146,7 +159,16 @@ export class PlayerView {
       progressiveTempo: settings.progressiveTempo,
     };
     this.player = new SongPlayer(entry.song.data, config);
-    this.player.on('phase', () => this.renderTransport());
+    this.player.on('phase', (phase) => {
+      // Heard the section first (H on a review card): now it's your turn.
+      if (phase === 'finished' && this.previewing) {
+        const mode = this.previewing;
+        this.previewing = null;
+        this.player?.configure({ mode });
+        this.player?.start();
+      }
+      this.renderTransport();
+    });
     this.player.on('pass', (r) => void this.onPass(r));
     this.player.on('tempo', (t) => this.setSetting({ tempo: t }, false));
     this.player.on('mark', (m) => {
@@ -260,11 +282,27 @@ export class PlayerView {
     this.setSetting({ mode: this.settings.mode === 'wait' ? 'play-along' : 'wait' });
   }
 
+  /** Choose the hands to practise here (the app's hand setting is left alone). */
   setHand(hand: HandChoice): void {
     if (this.review) return;
     this.hand = hand;
+    this.chosenHand = hand;
     this.player?.configure({ hands: hand });
+    this.actions.handShown(hand);
     this.renderAll();
+  }
+
+  /**
+   * Review card: hear the section first (listen mode at the card's tempo and
+   * hands), then the card starts again for you to play.
+   */
+  listenFirst(): void {
+    const player = this.player;
+    if (!this.review || !player || this.previewing) return;
+    this.previewing = player.config.mode;
+    player.configure({ mode: 'listen' });
+    player.start();
+    this.renderTransport();
   }
 
   setPreset(preset: VisualiserColors): void {
@@ -297,9 +335,9 @@ export class PlayerView {
     const req = requirement(progressOf(this.entry, id));
     this.loopAB = { a: null, b: null };
     this.applyRange();
-    if (req.hands !== this.hand) this.actions.setHand(req.hands);
+    if (req.hands !== this.hand) this.setHand(req.hands);
     this.setSetting({ mode: req.mode, tempo: req.tempo });
-    this.player?.configure({ loop: true, hands: req.hands });
+    this.player?.configure({ loop: true });
     this.player?.start();
   }
 
@@ -492,8 +530,12 @@ export class PlayerView {
     const playing = this.playing;
     const f = this.form;
     if (this.review) {
+      const line = this.previewing
+        ? `Listening at ${pct(player.config.tempo)} · then it's your turn (${MODE_NAMES[this.previewing].toLowerCase()})`
+        : `${HAND_NAMES[player.config.hands]} · ${MODE_NAMES[player.config.mode]} at ${pct(player.config.tempo)}`;
       this.transport.replaceChildren(
-        h('span.song-step-line', null, `${HAND_NAMES[player.config.hands]} · ${MODE_NAMES[player.config.mode]} at ${pct(player.config.tempo)}`),
+        h('span.song-step-line', null, line),
+        h('button.button-outline', { type: 'button', disabled: !!this.previewing, onclick: () => this.listenFirst() }, icon('volume-2'), h('span', null, 'Hear it'), h('kbd', null, 'H')),
         h('button.button-outline', { type: 'button', onclick: () => this.restart() }, icon('rotate-ccw'), h('span', null, 'Restart'), h('kbd', null, 'R')),
       );
       return;

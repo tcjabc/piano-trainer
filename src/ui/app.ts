@@ -162,14 +162,14 @@ export class App {
     this.player = new PlayerView(this.keyboard, {
       back: () => this.showLibraryTab('songs'),
       settingsChanged: (songs) => this.rememberSongSettings(songs),
-      setHand: (hand) => void this.setHand(hand),
+      handShown: (hand) => this.hands.set(hand),
       reviewState: (songId, sectionId) => this.songReviewState(songId, sectionId),
       toggleReview: (songId, sectionId) => this.toggleSongReview(songId, sectionId),
     });
     this.reviewPlayer = new PlayerView(this.keyboard, {
       back: () => undefined,
       settingsChanged: () => undefined,
-      setHand: () => undefined,
+      handShown: () => undefined,
       reviewState: (songId, sectionId) => this.songReviewState(songId, sectionId),
       toggleReview: (songId, sectionId) => this.toggleSongReview(songId, sectionId),
     });
@@ -199,7 +199,11 @@ export class App {
     this.wireMetronome();
     this.zoom.on('input', (z) => this.keyboard.setZoom(z));
     this.zoom.on('commit', (z) => void this.patchSettings({ keyboardZoom: z }));
-    this.hands.on('change', (hand) => (this.inFreePractice ? this.setFreeHand(hand) : void this.setHand(hand)));
+    this.hands.on('change', (hand) => {
+      if (this.screen === 'song') this.player.setHand(hand);
+      else if (this.inFreePractice) this.setFreeHand(hand);
+      else void this.setHand(hand);
+    });
     this.wireControls();
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       this.visualiser.refreshTokens();
@@ -447,7 +451,7 @@ export class App {
     this.player.setPreset(s.visualiser.colors);
     this.visualiser.setMode(s.visualiser.colors);
     this.visualiser.setEmbers(s.visualiser.sparks);
-    this.hands.set(this.inFreePractice ? s.freePractice.notes.hand : s.hand);
+    this.hands.set(this.legendHand);
     this.hands.setNumbersVisible(s.showFingerNumbers);
     this.zoom.set(s.keyboardZoom);
     this.keyboard.setZoom(s.keyboardZoom);
@@ -550,7 +554,10 @@ export class App {
       { keys: ['w'], label: 'W', hint: 'Wait / play-along', action: 'song-wait', optional: true, run: () => p.toggleWait() },
       { keys: ['v'], label: 'V', hint: 'View', action: 'song-view', optional: true, run: () => p.toggleView() },
       { keys: ['Escape'], label: 'Esc', hint: 'Songs', action: 'back', run: () => this.showLibraryTab('songs') },
-      ...this.handHotkeys(),
+      // The player's own hands; Study's hand setting is left alone.
+      { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', optional: true, run: () => p.setHand('left') },
+      { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => p.setHand('right') },
+      { keys: ['3'], label: '3', hint: '', hidden: true, action: 'hand-both', run: () => p.setHand('both') },
       ...this.commonHotkeys(),
     ]);
   }
@@ -580,7 +587,7 @@ export class App {
     if (screen === 'today' || screen === 'free') this.lastStudy = screen;
     this.root.querySelector('.app')?.setAttribute('data-screen', screen);
     this.header.setArea(screen === 'settings' ? null : this.lastArea);
-    this.hands.set(this.inFreePractice ? this.settings.freePractice.notes.hand : this.settings.hand);
+    this.hands.set(this.legendHand);
     this.updateVisualiser();
 
     if (screen === 'play') {
@@ -706,6 +713,12 @@ export class App {
   }
 
   /** Free practice has its own hand; the legend and 1/2/3 follow it on its screens. */
+  /** What the hand legend shows: the song player's own hands, free practice's, or Study's. */
+  private get legendHand(): HandChoice {
+    if (this.screen === 'song') return this.player.currentHand;
+    return this.inFreePractice ? this.settings.freePractice.notes.hand : this.settings.hand;
+  }
+
   private get inFreePractice(): boolean {
     return this.screen === 'free' || (this.screen === 'drill' && this.drillKind === 'free');
   }
@@ -926,7 +939,6 @@ export class App {
     this.library.setHand(hand);
     this.library.refreshDetail();
     this.decksPanel.refresh();
-    this.player.setHand(hand);
     if (this.screen === 'drill' && this.drillKind === 'review' && !(await this.startDrill(this.drillAhead))) this.show('today');
   }
 

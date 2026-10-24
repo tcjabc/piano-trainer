@@ -3,7 +3,8 @@
  * the app plays itself.
  *
  * - Wait: the song moves at tempo but stops at each step until its notes
- *   have been played (a chord in any order); wrong notes are counted.
+ *   have been played (a chord in any order); wrong notes are counted. The
+ *   pass ends as soon as the last note is played.
  * - Play-along: it runs at tempo with the metronome (after a bar of
  *   count-in); each press is judged on time / early / late, unplayed notes
  *   are missed.
@@ -293,6 +294,7 @@ export class SongPlayer extends Emitter<PlayerEvents> {
       for (const n of this.judge.sweep(now / 1000)) this.mark({ kind: 'missed', midi: n.midi, noteId: n.id, at: now });
     }
 
+    // (Wait mode with notes to play ends on the last one, in noteOn; a range with none runs to its end.)
     const finished =
       this.config.mode === 'play-along'
         ? now >= this.timeAt(end) + GRADING.songs.hitWindowMs
@@ -330,7 +332,9 @@ export class SongPlayer extends Emitter<PlayerEvents> {
       if (result === 'wrong') this.mark({ kind: 'wrong', midi, at: time });
       else if (result !== 'again') this.mark({ kind: 'hit', midi, noteId: note?.id, at: time });
       // Played ahead of the song: let it catch up at tempo from where it is.
-      if (result === 'step' || result === 'done') this.anchor(this.pos, Math.max(time, performance.now()));
+      if (result === 'step') this.anchor(this.pos, Math.max(time, performance.now()));
+      // The last note: the pass is over, without waiting for the song to reach the end.
+      if (result === 'done') this.finishPass();
     } else if (this.config.mode === 'play-along' && this.judge) {
       const judged = this.judge.press(midi, time / 1000);
       if (judged) this.mark({ kind: judged.timing, midi, noteId: judged.note.id, deltaMs: judged.deltaMs, at: time });

@@ -11,7 +11,7 @@ import { GRADING, gradeScale, gradeSongPass, gradeTimed, scalePassed, type SongP
 import type { StaffKind } from '../../core/notation';
 import { recordReview, SessionQueue } from '../../core/scheduler';
 import { storage, uuid, type AttemptRecord, type CardRecord } from '../../core/storage';
-import type { Grade } from 'ts-fsrs';
+import { Rating, type Grade } from 'ts-fsrs';
 import { cardItem, type DrillItem } from './items';
 
 /** How a showing went, at the first answer (notes, chords) or when finished (scales). */
@@ -29,7 +29,11 @@ export interface Outcome {
 
 export function gradeOutcome(module: DrillItem['module'], o: Outcome, hinted: boolean): Grade {
   if (module === 'scales') return gradeScale(o.errors ?? 0, o.ms, o.notes ?? 1, hinted);
-  if (module === 'songs') return gradeSongPass(o.song ?? { mode: 'wait', accuracy: o.correct ? 1 : 0, onTime: null });
+  if (module === 'songs') {
+    // Hearing the section first caps the grade at Hard, as for other cards.
+    const grade = gradeSongPass(o.song ?? { mode: 'wait', accuracy: o.correct ? 1 : 0, onTime: null });
+    return hinted ? (Math.min(grade, Rating.Hard) as Grade) : grade;
+  }
   return gradeTimed(o.correct, o.ms, hinted, module === 'chords' ? GRADING.chords : GRADING.notes);
 }
 

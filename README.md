@@ -160,10 +160,10 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
   - *Notation*: the score with a cursor that follows the song, drawn by OpenSheetMusicDisplay. It's MusicXML only and loads on first use.
 - **The keyboard** always shows the next keys to play, with finger numbers where known.
 - **Modes:**
-  - **Wait** (the default for learning): the song stops at each step until you play its notes; a chord's notes can come in any order. Wrong notes flash and are counted, nothing more.
+  - **Wait** (the default for learning): the song stops at each step until you play its notes; a chord's notes can come in any order. Wrong notes flash and are counted, nothing more. The pass ends as soon as the last note is played.
   - **Play-along**: the song runs at tempo with the metronome, after a bar of count-in. Each note is marked on time, early, late or missed. The windows (±100 ms on time, ±250 ms a hit) are in `src/core/grading.ts`.
   - **Listen**: the app plays the chosen hands.
-- **Hands:** the hand legend (1 2 3) picks the hands you play. The other hand is played by the app, muted, or hidden (Options).
+- **Hands:** the hand legend (1 2 3) picks the hands you play here. The choice stays with the player (it starts from Study's hand): practising a step, or changing hands here, never changes Study's hand setting. The other hand is played by the app, muted, or hidden (Options).
 - **Tempo:** 25–150% (, and . change it by 5%; a learned tempo knob works too).
   - **+5% after a clean pass** raises the tempo after each clean pass of the loop, up to 100%.
 - **Loops:** the current section loops. You can also set loop points with **[** (A) and **]** (B), at the current bar's beat; **\\** clears them.
@@ -179,6 +179,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Stats** per section: last and best accuracy, best tempo of a clean pass, passes and last practised.
 - **Review:** **Add to review** makes the section a card in Today, with its own daily limit (Settings, default 2).
   - In a session it plays once at the step it has reached, and the pass counts towards its path.
+  - **H** plays the section first (listen mode at the card's tempo), then it's your turn. Like hearing the answer on other cards, this caps the grade at Hard.
   - Grades: under 80% right is Again; a pass that isn't clean is Hard; a clean pass is Good, or Easy when perfect (wait mode) or 95%+ on time (play-along).
 
 **Fingering:** taken from the MusicXML where present. Click a falling note while stopped to set or clear its finger (1–5). It's saved with the song and written into its score, so the notation shows it too. Nothing is generated automatically.

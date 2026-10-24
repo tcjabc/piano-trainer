@@ -59,8 +59,10 @@ export class SongTask implements Task {
     this.deps.player.restart();
   }
 
-  /** Nothing to give away: the notes are on screen. */
-  hint(): void {}
+  /** H: hear the section first (as with other cards, this caps the grade at Hard). */
+  hint(): void {
+    this.deps.player.listenFirst();
+  }
 
   pause(paused: boolean): void {
     const { player } = this.deps;
