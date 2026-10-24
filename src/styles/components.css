@@ -1,0 +1,894 @@
+/* Component styles. Every colour, size, radius and timing is a token from tokens.css. */
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+
+.app {
+  display: grid;
+  /* Toolbar and keyboard rows have fixed heights, so zooming never moves the staff.
+     The fourth row is the visualiser, collapsed unless it is on. */
+  grid-template-rows: var(--header-height) minmax(0, 1fr) var(--toolbar-height) 0 var(--keyboard-height);
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Play with the visualiser: the staff takes what it needs, the visualiser the rest. */
+.app[data-visualiser] {
+  grid-template-rows: var(--header-height) auto var(--toolbar-height) minmax(0, 1fr) var(--keyboard-height);
+}
+
+.stage {
+  display: grid;
+  place-items: center;
+  padding: var(--section-gap);
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Settings can be taller than the stage; align to the top so it scrolls naturally. */
+.app[data-screen='settings'] .stage {
+  place-items: start center;
+}
+
+.icon {
+  display: inline-flex;
+  font-size: var(--icon-size);
+  line-height: 0;
+  flex: none;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-20);
+  padding: 0 var(--spacing-20);
+  border-bottom: var(--border-hairline) solid var(--color-border);
+}
+
+.header-start {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-30);
+}
+
+/* Area tabs: quiet text, the current one underlined. */
+.tabs {
+  display: flex;
+  align-self: stretch;
+  gap: var(--spacing-20);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  padding: 0;
+  border: none;
+  border-bottom: var(--border-divider) solid transparent;
+  background: none;
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--duration-feedback) var(--easing), border-color var(--duration-feedback) var(--easing);
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tab[aria-current='page'] {
+  border-bottom-color: var(--color-text);
+  color: var(--color-text);
+}
+
+.tab kbd {
+  min-width: 0;
+  padding: 0 var(--spacing-2);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--element-gap);
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-heading);
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-20);
+  min-width: 0;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-caption);
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.status .icon {
+  font-size: var(--icon-size-sm);
+}
+
+.status.is-muted {
+  color: var(--color-text-muted);
+}
+
+.status-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.due-count {
+  font-weight: var(--font-weight-bold);
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-default);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--duration-feedback) var(--easing);
+}
+
+.icon-button:hover {
+  background: var(--color-border);
+}
+
+/* ── Panels (the "app window" card) ─────────────────────────────────────── */
+
+.panel {
+  position: relative;
+  width: 100%;
+  max-width: var(--panel-max-width);
+  padding: var(--card-padding);
+  border-radius: var(--radius-cards);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+/* The single Carbon Black pill: Start on Today. */
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  padding: var(--spacing-10) var(--spacing-20);
+  border: none;
+  border-radius: var(--radius-buttons);
+  background: var(--color-primary-bg);
+  color: var(--color-primary-fg);
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.button-primary .icon {
+  font-size: var(--icon-size-sm);
+}
+
+/* Quieter actions. */
+.button-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  height: var(--control-height);
+  padding: 0 var(--spacing-10);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-default);
+  background: transparent;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-caption);
+  cursor: pointer;
+  transition: border-color var(--duration-feedback) var(--easing);
+}
+
+.button-outline:hover {
+  border-color: var(--color-text);
+}
+
+.button-outline .icon {
+  font-size: var(--icon-size-sm);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--element-gap);
+}
+
+/* ── Today ──────────────────────────────────────────────────────────────── */
+
+.today-panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacing-20);
+  text-align: center;
+  max-width: var(--settings-max-width);
+  padding-block: var(--spacing-60);
+}
+
+.today-body {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacing-20);
+}
+
+.today-count {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-10);
+}
+
+.today-unit {
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.today-detail {
+  font-size: var(--text-body-sm);
+}
+
+.today-hint {
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+/* ── Staff ──────────────────────────────────────────────────────────────── */
+
+.staff-panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacing-10);
+  min-height: var(--staff-min-height);
+  transition: box-shadow var(--duration-feedback) var(--easing);
+}
+
+.staff-drawing {
+  width: 100%;
+  max-width: var(--staff-drawing-width);
+  color: var(--color-notation);
+  transition: opacity var(--duration-feedback) var(--easing);
+}
+
+.staff-drawing svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Fit between header, hint bar and keyboard; the SVG scales its content to fit. */
+  max-height: calc(100dvh - var(--header-height) - var(--keyboard-height) - var(--staff-chrome-height));
+}
+
+/* VexFlow writes black/grey presentation attributes; route them through currentColor. */
+.notation[fill='black'],
+.notation [fill='black'],
+.notation [fill='#000'],
+.notation [fill='#000000'] {
+  fill: currentColor;
+}
+.notation[stroke='black'],
+.notation [stroke='#444'],
+.notation [stroke='black'],
+.notation [stroke='#000'],
+.notation [stroke='#000000'] {
+  stroke: currentColor;
+}
+
+.notation .vf-stavenote {
+  transition: color var(--duration-feedback) var(--easing);
+}
+
+.staff-panel[data-state='correct'] .vf-stavenote {
+  color: var(--color-correct);
+}
+
+.staff-panel[data-state='wrong'] .vf-stavenote {
+  color: var(--color-wrong);
+}
+
+.staff-panel[data-state='correct'] {
+  box-shadow: var(--shadow-card), 0 0 0 var(--border-divider) var(--color-correct);
+}
+
+.staff-panel[data-state='wrong'] {
+  box-shadow: var(--shadow-card), 0 0 0 var(--border-divider) var(--color-wrong);
+}
+
+.staff-panel[data-state='paused'] .staff-drawing {
+  opacity: 0;
+}
+
+.staff-caption {
+  min-height: calc(var(--text-body-sm) * var(--leading));
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.staff-panel[data-state='wrong'] .staff-caption {
+  color: var(--color-wrong);
+}
+
+.staff-corner {
+  position: absolute;
+  top: var(--spacing-20);
+  right: var(--spacing-30);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+/* ── Settings ───────────────────────────────────────────────────────────── */
+
+.settings-panel {
+  display: grid;
+  gap: var(--section-gap);
+  max-width: var(--settings-max-width);
+}
+
+.settings-body {
+  display: grid;
+  gap: var(--section-gap);
+}
+
+.settings-section {
+  display: grid;
+  gap: var(--spacing-10);
+  padding-top: var(--spacing-20);
+  border-top: var(--border-divider) solid var(--color-border);
+}
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: var(--spacing-20);
+}
+
+.field-label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.field-note {
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+.settings-message:empty {
+  display: none;
+}
+
+.control {
+  height: var(--control-height);
+  padding: 0 var(--spacing-10);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-default);
+  background: var(--color-surface);
+  font-weight: var(--font-weight-semibold);
+}
+
+select.control {
+  width: 100%;
+}
+
+.control-number {
+  width: calc(var(--control-height) * 2.5);
+}
+
+.range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--element-gap);
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--element-gap);
+}
+
+.checkbox {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin: 0;
+  accent-color: var(--color-primary-bg);
+}
+
+.segmented {
+  display: inline-flex;
+  justify-self: start;
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-default);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  height: calc(var(--control-height) - var(--border-hairline) * 2);
+  padding: 0 var(--spacing-10);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-caption);
+  cursor: pointer;
+  transition: background-color var(--duration-feedback) var(--easing);
+}
+
+.segment .icon {
+  font-size: var(--icon-size-sm);
+}
+
+.segment:has(input:checked) {
+  background: var(--color-primary-bg);
+  color: var(--color-primary-fg);
+}
+
+.segment:has(input:focus-visible) {
+  outline: var(--border-divider) solid var(--color-focus);
+  outline-offset: var(--spacing-2);
+}
+
+/* ── Hint bar ───────────────────────────────────────────────────────────── */
+
+/* Toolbar above the keyboard: hints centred, zoom control in the right corner. */
+.keyboard-toolbar {
+  display: grid;
+  grid-template-columns: var(--zoom-control-width) minmax(0, 1fr) var(--zoom-control-width);
+  align-items: center;
+  min-height: 0;
+  padding: 0 var(--spacing-10);
+}
+
+.hint-bar {
+  grid-column: 2;
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-20);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+  color: var(--color-text-muted);
+}
+
+.zoom-control {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  color: var(--color-text-muted);
+}
+
+.zoom-button {
+  width: var(--zoom-button-size);
+  height: var(--zoom-button-size);
+}
+
+.zoom-button .icon {
+  font-size: var(--icon-size-sm);
+}
+
+.zoom-slider {
+  width: var(--zoom-slider-width);
+  margin: 0;
+  accent-color: var(--color-text);
+  cursor: pointer;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-5);
+}
+
+/* ── Keyboard ───────────────────────────────────────────────────────────── */
+
+.keyboard-dock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 0;
+  border-top: var(--border-hairline) solid var(--color-border);
+  background: var(--color-surface-sunken);
+}
+
+.keyboard {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+
+.keyboard-track {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--white-count) * var(--wk, 0px));
+}
+
+.keyboard.is-animated .keyboard-track {
+  transition: transform var(--duration-scroll) var(--easing);
+}
+
+.key {
+  position: absolute;
+  top: 0;
+  cursor: pointer;
+  transition: background-color var(--duration-press) var(--easing);
+}
+
+.keyboard.is-animated .key {
+  transition:
+    background-color var(--duration-press) var(--easing),
+    left var(--duration-scroll) var(--easing),
+    width var(--duration-scroll) var(--easing);
+}
+
+.key-white {
+  left: calc(var(--i) * var(--wk));
+  width: var(--wk);
+  height: 100%;
+  border: var(--border-hairline) solid var(--color-key-edge);
+  border-top: none;
+  border-radius: 0 0 var(--radius-default) var(--radius-default);
+  background: var(--color-key-white);
+}
+
+.key-black {
+  z-index: 1;
+  left: calc(var(--i) * var(--wk) - var(--wk) * var(--black-key-width-ratio) / 2);
+  width: calc(var(--wk) * var(--black-key-width-ratio));
+  height: var(--black-key-height);
+  border-radius: 0 0 var(--radius-default) var(--radius-default);
+  background: var(--color-key-black);
+}
+
+.key-white.is-pressed {
+  background: var(--color-key-white-pressed);
+}
+
+.key-black.is-pressed {
+  background: var(--color-key-black-pressed);
+}
+
+.key.flash-correct {
+  background: var(--color-correct);
+}
+
+.key.flash-wrong {
+  background: var(--color-wrong);
+}
+
+/* The key that should have been played after a wrong answer. */
+.key.is-target {
+  box-shadow: inset 0 calc(var(--border-divider) * -3) 0 var(--color-correct);
+  background: var(--color-correct-soft);
+}
+
+.key-black.is-target {
+  background: var(--color-correct);
+}
+
+.key-label {
+  position: absolute;
+  bottom: var(--spacing-5);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-caption);
+  color: var(--color-key-label);
+  pointer-events: none;
+}
+
+/* Middle C: slightly stronger than the other C labels. */
+.key-label-middle {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-key-label-strong);
+}
+
+.finger-badge {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--spacing-20) + var(--spacing-5));
+  transform: translateX(-50%);
+  display: inline-grid;
+  place-items: center;
+  width: var(--finger-badge-size);
+  height: var(--finger-badge-size);
+  border-radius: var(--radius-default);
+  background: var(--finger-color);
+  box-shadow: 0 0 0 var(--border-hairline) var(--color-canvas);
+  color: var(--color-on-functional);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  pointer-events: none;
+}
+
+.finger-hand {
+  position: absolute;
+  top: calc(var(--spacing-8) * -1.5);
+  font-family: var(--font-ui);
+  font-size: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.key-black .finger-badge {
+  bottom: var(--spacing-8);
+}
+
+/* ── Hand legend (beside the keyboard) ──────────────────────────────────── */
+
+.hand-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  padding: 0 var(--spacing-20) 0 var(--spacing-10);
+  border-left: var(--border-hairline) solid var(--color-border);
+}
+
+.hand {
+  display: grid;
+  place-items: center;
+  padding: var(--spacing-5);
+  border: none;
+  border-radius: var(--radius-default);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  opacity: var(--hand-dimmed-opacity);
+  transition: opacity var(--duration-feedback) var(--easing);
+}
+
+.hand[aria-pressed='true'] {
+  opacity: 1;
+}
+
+.hand-svg {
+  display: block;
+  width: var(--hand-size);
+  height: var(--hand-size);
+  overflow: visible;
+}
+
+/* The supplied icon is a right hand; the left hand is its mirror image. */
+.hand-left .hand-svg {
+  transform: scale(-1, 1);
+}
+
+.hand-svg .finger-1 { fill: var(--finger-1); }
+.hand-svg .finger-2 { fill: var(--finger-2); }
+.hand-svg .finger-3 { fill: var(--finger-3); }
+.hand-svg .finger-4 { fill: var(--finger-4); }
+.hand-svg .finger-5 { fill: var(--finger-5); }
+
+.finger-number {
+  display: none;
+  fill: var(--color-on-functional);
+  font-family: var(--font-mono);
+  font-size: var(--hand-number-size);
+  font-weight: var(--font-weight-bold);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.show-numbers .finger-number {
+  display: inline;
+}
+
+/* Keep numbers readable on the mirrored hand. */
+.hand-left .finger-number {
+  transform: scale(-1, 1);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* ── Fingering on the staff ─────────────────────────────────────────────── */
+
+.notation [data-finger='1'] text { fill: var(--finger-1); }
+.notation [data-finger='2'] text { fill: var(--finger-2); }
+.notation [data-finger='3'] text { fill: var(--finger-3); }
+.notation [data-finger='4'] text { fill: var(--finger-4); }
+.notation [data-finger='5'] text { fill: var(--finger-5); }
+
+/* ── Play ───────────────────────────────────────────────────────────────── */
+
+.play-panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacing-10);
+}
+
+.play-drawing svg {
+  /* Leave room for the readout under the staff. */
+  max-height: calc(100dvh - var(--header-height) - var(--toolbar-height) - var(--keyboard-height) - var(--play-chrome-height));
+}
+
+.app[data-visualiser] .play-drawing svg {
+  max-height: var(--play-staff-height);
+}
+
+.play-readout {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacing-5);
+  text-align: center;
+}
+
+.play-notes {
+  min-height: calc(var(--text-body) * var(--leading));
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-semibold);
+  word-spacing: var(--spacing-5);
+}
+
+.play-chord {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-10);
+  min-height: calc(var(--text-heading) * var(--leading));
+}
+
+.play-chord-symbol {
+  font-size: var(--text-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-heading);
+}
+
+.play-chord-name {
+  font-size: var(--text-body-sm);
+}
+
+/* Play keeps the keyboard full width; the hand legend belongs to Study. */
+.app[data-screen='play'] .hand-legend {
+  display: none;
+}
+
+/* ── Visualiser ─────────────────────────────────────────────────────────── */
+
+/* Always in the grid (its row collapses to 0 when off), so the rows below keep their place. */
+.visualiser {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.visualiser-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Key names (Play: N) ────────────────────────────────────────────────── */
+
+.key {
+  container-type: inline-size;
+}
+
+.key-name {
+  display: none;
+  position: absolute;
+  bottom: var(--spacing-5);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-caption);
+  color: var(--color-key-label);
+  pointer-events: none;
+}
+
+.key-black .key-name {
+  color: var(--color-key-name-on-black);
+}
+
+.keyboard.show-names .key-name {
+  display: block;
+}
+
+/* Too narrow to read: leave the key blank rather than overflow it. */
+@container (max-width: 14px) {
+  .key-name {
+    visibility: hidden;
+  }
+}
+
+/* ── Controls (MIDI learn) ──────────────────────────────────────────────── */
+
+.control-list {
+  display: grid;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--spacing-10);
+  min-height: var(--control-height);
+  padding: var(--spacing-5) 0;
+  border-bottom: var(--border-hairline) solid var(--color-border);
+}
+
+.control-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  font-weight: var(--font-weight-semibold);
+}
+
+.control-name {
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-learning {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-caption);
+}
+
+.control-row[data-learning='true'] {
+  border-bottom-color: var(--color-text);
+}
+
+.control-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--element-gap);
+}
+
+.control-buttons select.control {
+  width: auto;
+  font-size: var(--text-caption);
+}
+
+.controls-message {
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+/* Warning (control moved from another action, piano key pressed): stays achromatic. */
+.controls-message.is-warning {
+  padding: var(--spacing-5) var(--spacing-10);
+  border-left: var(--border-divider) solid var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The mapped controller control, next to its key in the hint bar. */
+.hint-control {
+  padding: 0 var(--spacing-5);
+  border: var(--border-hairline) dashed var(--color-border-strong);
+  border-radius: var(--radius-default);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+/* Not enough room: drop the mapped controls, keep the keys. */
+.hint-bar.is-compact .hint-control {
+  display: none;
+}

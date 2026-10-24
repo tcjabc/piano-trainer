@@ -1,0 +1,11 @@
+<!-- Right hand, five fingers. Based on Vadivam "hand" with a thumb added in the same stroke style.
+     Mirror with transform="scale(-1,1)" for the left hand.
+     Fingertip dots: fill them from the finger-colour tokens (--finger-1 … --finger-5). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 0 24 24">
+	<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V4a2 2 0 1 1 4 0v7M8 6a2 2 0 1 0-4 0v7l-2.4-2.4a1.5 1.5 0 0 0-2.1 2.1l5 5c1.4 2.6 3.5 4.3 6.5 4.3h.2c3.08 0 4.62 0 5.797-.6a5.5 5.5 0 0 0 2.404-2.403C20 17.82 20 16.28 20 13.2V8a2 2 0 1 0-4 0m-4-3a2 2 0 1 1 4 0v6" />
+	<circle class="finger finger-1" cx="0.55" cy="11.65" r="1.3" fill="var(--finger-1)" />
+	<circle class="finger finger-2" cx="6" cy="6" r="1.3" fill="var(--finger-2)" />
+	<circle class="finger finger-3" cx="10" cy="4" r="1.3" fill="var(--finger-3)" />
+	<circle class="finger finger-4" cx="14" cy="5" r="1.3" fill="var(--finger-4)" />
+	<circle class="finger finger-5" cx="18" cy="8" r="1.3" fill="var(--finger-5)" />
+</svg>

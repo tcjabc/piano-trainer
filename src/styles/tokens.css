@@ -1,0 +1,301 @@
+/*
+ * Design tokens — the only place colours, sizes, radii, shadows and timings
+ * are defined. Based on docs/design-system.md (Desktop.fm), adapted for an app.
+ * Components must reference these variables, never raw values.
+ */
+
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/Chillax-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/Chillax-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/Chillax-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ── Neutral scale (from the design system) ───────────────────────── */
+  --neutral-canvas-mist: #f1f2f3;
+  --neutral-carbon-black: #111111;
+  --neutral-pure-white: #ffffff;
+  --neutral-graphite: #2d2d2d;
+  --neutral-pale-stone: #dddddd;
+  --neutral-silver-mist: #b4b4b4;
+  --neutral-ash: #6b6b6b;
+  /* Dark-theme extensions of the same scale */
+  --neutral-night: #0b0b0c;
+  --neutral-coal: #1c1c1d;
+  --neutral-iron: #3a3a3b;
+  --neutral-smoke: #8f8f8f;
+
+  /* ── Semantic colours: light theme ────────────────────────────────── */
+  --color-canvas: var(--neutral-canvas-mist);
+  --color-surface: var(--neutral-pure-white);
+  --color-surface-sunken: var(--neutral-canvas-mist);
+  --color-text: var(--neutral-carbon-black);
+  --color-text-muted: var(--neutral-ash);
+  --color-border: var(--neutral-pale-stone);
+  --color-border-strong: var(--neutral-silver-mist);
+  --color-disabled: var(--neutral-silver-mist);
+  --color-primary-bg: var(--neutral-carbon-black);
+  --color-primary-fg: var(--neutral-pure-white);
+  --color-focus: var(--neutral-carbon-black);
+  --color-notation: var(--neutral-carbon-black);
+
+  /* Piano keys */
+  --color-key-white: var(--neutral-pure-white);
+  --color-key-white-pressed: var(--neutral-pale-stone);
+  --color-key-black: var(--neutral-graphite);
+  --color-key-black-pressed: var(--neutral-ash);
+  --color-key-edge: var(--neutral-silver-mist);
+  --color-key-out-of-range: var(--neutral-canvas-mist);
+  /* C labels sit on white keys, which stay pale in both themes. */
+  --color-key-label: var(--neutral-ash);
+  --color-key-label-strong: var(--neutral-carbon-black);
+  --color-key-name-on-black: var(--neutral-pale-stone);
+
+  /* ── Functional colours (the only chromatic tokens) ───────────────── */
+  --color-correct: #2e7d4f;
+  --color-correct-soft: #d8eee0;
+  --color-wrong: #c2412d;
+  --color-wrong-soft: #f6dcd6;
+  --color-on-functional: var(--neutral-pure-white);
+
+  /*
+   * Finger colours 1 (thumb) … 5 (little finger), shared by both hands.
+   * Chosen to stay apart from each other and from correct/wrong, including
+   * under red-green colour blindness, and to keep 4.5:1 contrast with
+   * --color-on-functional so numbers drawn on them stay legible.
+   */
+  --finger-1: #8a5a12; /* amber  */
+  --finger-2: #1d5aa6; /* blue   */
+  --finger-3: #7466c4; /* violet */
+  --finger-4: #087692; /* petrol */
+  --finger-5: #8e3a6a; /* plum   */
+
+  /* ── Visualiser (Play) — the one place strong colour is allowed ───── */
+  /* Rainbow by pitch class, C = red … B = violet. */
+  --viz-pc-0: #ce2222; /* C */
+  --viz-pc-1: #ce6b22; /* C♯ */
+  --viz-pc-2: #ceb422; /* D */
+  --viz-pc-3: #9fce22; /* D♯ */
+  --viz-pc-4: #56ce22; /* E */
+  --viz-pc-5: #22ce36; /* F */
+  --viz-pc-6: #22ce80; /* F♯ */
+  --viz-pc-7: #22cec9; /* G */
+  --viz-pc-8: #228ace; /* G♯ */
+  --viz-pc-9: #2241ce; /* A */
+  --viz-pc-10: #4b22ce; /* A♯ */
+  --viz-pc-11: #9522ce; /* B */
+  --viz-accent: #1f7fd1;
+  /* Additive light on dark; plain painting on light, where adding would wash out to white. */
+  --viz-blend: source-over;
+  /* Motion, read by the canvas code (plain numbers: px/s, ms, px). */
+  --viz-rise-speed: 150;
+  --viz-fade-ms: 1800;
+  --viz-reduced-fade-ms: 500;
+  --viz-glow: 16;
+  --viz-spark-count: 10;
+
+  /* ── Typography ───────────────────────────────────────────────────── */
+  --font-ui: 'Chillax', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --text-caption: 12px;
+  --text-body-sm: 16px;
+  --text-body: 18px;
+  --text-heading: 28px;
+  --text-display: 64px;
+
+  --leading: 1.25;
+  --tracking-caption: 0;
+  --tracking-body: -0.016em;
+  --tracking-heading: -0.036em;
+
+  /* ── Spacing ──────────────────────────────────────────────────────── */
+  --spacing-2: 2px;
+  --spacing-5: 5px;
+  --spacing-8: 8px;
+  --spacing-10: 10px;
+  --spacing-20: 20px;
+  --spacing-30: 30px;
+  --spacing-60: 60px;
+
+  --section-gap: var(--spacing-30);
+  --card-padding: var(--spacing-30);
+  --element-gap: var(--spacing-8);
+
+  /* ── Shape ────────────────────────────────────────────────────────── */
+  --radius-default: 1.5px;
+  --radius-buttons: 20px;
+  --radius-cards: 25px;
+  --border-hairline: 1.5px;
+  --border-divider: 2px;
+
+  /* ── Elevation ────────────────────────────────────────────────────── */
+  --shadow-card: 0 1px 3px rgba(17, 17, 17, 0.08), 0 4px 12px rgba(17, 17, 17, 0.06);
+
+  /* ── Layout ───────────────────────────────────────────────────────── */
+  --header-height: 52px;
+  --toolbar-height: 36px;
+  --zoom-control-width: 180px;
+  --zoom-slider-width: 112px;
+  --zoom-button-size: 26px;
+  --panel-max-width: 760px;
+  --settings-max-width: 640px;
+  --staff-min-height: 260px;
+  --staff-drawing-width: 460px;
+  /* Vertical space around the drawing: stage and panel padding, caption, hint bar. */
+  --staff-chrome-height: 220px;
+  --keyboard-height: clamp(120px, 22vh, 200px);
+  --black-key-height: 62%;
+  --black-key-width-ratio: 0.6;
+  --icon-size: 18px;
+  --icon-size-sm: 14px;
+  --control-height: 36px;
+  --finger-badge-size: 20px;
+  --play-staff-height: 180px;
+  /* Stage and panel padding plus the note and chord readout. */
+  --play-chrome-height: 260px;
+  --hand-size: clamp(80px, calc(var(--keyboard-height) - var(--spacing-30)), 104px);
+  /* Fingertip numbers, in the hand icon's 24-unit coordinate space. */
+  --hand-number-size: 2px;
+  --hand-dimmed-opacity: 0.3;
+
+  /* ── Motion ───────────────────────────────────────────────────────── */
+  --duration-press: 60ms;
+  --duration-feedback: 160ms;
+  --duration-scroll: 280ms;
+  --easing: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Drill timing, read by JS: how long the success flash shows before the next card. */
+  --drill-advance-delay: 320ms;
+
+  color-scheme: light;
+}
+
+/* ── Dark theme: inverted neutral scale, same structure ─────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-canvas: var(--neutral-night);
+    --color-surface: var(--neutral-coal);
+    --color-surface-sunken: var(--neutral-night);
+    --color-text: var(--neutral-canvas-mist);
+    --color-text-muted: var(--neutral-smoke);
+    --color-border: var(--neutral-iron);
+    --color-border-strong: var(--neutral-ash);
+    --color-disabled: var(--neutral-iron);
+    --color-primary-bg: var(--neutral-canvas-mist);
+    --color-primary-fg: var(--neutral-carbon-black);
+    --color-focus: var(--neutral-canvas-mist);
+    --color-notation: var(--neutral-canvas-mist);
+
+    --color-key-white: var(--neutral-pale-stone);
+    --color-key-white-pressed: var(--neutral-silver-mist);
+    --color-key-black: var(--neutral-carbon-black);
+    --color-key-black-pressed: var(--neutral-ash);
+    --color-key-edge: var(--neutral-ash);
+    --color-key-out-of-range: var(--neutral-smoke);
+    --color-key-label: var(--neutral-iron);
+
+    --color-correct: #4fb27a;
+    --color-correct-soft: #173a27;
+    --color-wrong: #e8735e;
+    --color-wrong-soft: #45201a;
+    --color-on-functional: var(--neutral-carbon-black);
+
+    --finger-1: #e8ad3a;
+    --finger-2: #3ba5f7;
+    --finger-3: #c8adfd;
+    --finger-4: #97e4f9;
+    --finger-5: #cc79c0;
+
+    --viz-pc-0: #f84f4f; /* C */
+    --viz-pc-1: #f8964f; /* C♯ */
+    --viz-pc-2: #f8de4f; /* D */
+    --viz-pc-3: #caf84f; /* D♯ */
+    --viz-pc-4: #82f84f; /* E */
+    --viz-pc-5: #4ff863; /* F */
+    --viz-pc-6: #4ff8ab; /* F♯ */
+    --viz-pc-7: #4ff8f3; /* G */
+    --viz-pc-8: #4fb5f8; /* G♯ */
+    --viz-pc-9: #4f6df8; /* A */
+    --viz-pc-10: #784ff8; /* A♯ */
+    --viz-pc-11: #bf4ff8; /* B */
+    --viz-accent: #5cc8ff;
+    /* Additive light on dark; plain painting on light, where adding would wash out to white. */
+    --viz-blend: lighter;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-canvas: var(--neutral-night);
+  --color-surface: var(--neutral-coal);
+  --color-surface-sunken: var(--neutral-night);
+  --color-text: var(--neutral-canvas-mist);
+  --color-text-muted: var(--neutral-smoke);
+  --color-border: var(--neutral-iron);
+  --color-border-strong: var(--neutral-ash);
+  --color-disabled: var(--neutral-iron);
+  --color-primary-bg: var(--neutral-canvas-mist);
+  --color-primary-fg: var(--neutral-carbon-black);
+  --color-focus: var(--neutral-canvas-mist);
+  --color-notation: var(--neutral-canvas-mist);
+
+  --color-key-white: var(--neutral-pale-stone);
+  --color-key-white-pressed: var(--neutral-silver-mist);
+  --color-key-black: var(--neutral-carbon-black);
+  --color-key-black-pressed: var(--neutral-ash);
+  --color-key-edge: var(--neutral-ash);
+  --color-key-out-of-range: var(--neutral-smoke);
+  --color-key-label: var(--neutral-iron);
+
+  --color-correct: #4fb27a;
+  --color-correct-soft: #173a27;
+  --color-wrong: #e8735e;
+  --color-wrong-soft: #45201a;
+  --color-on-functional: var(--neutral-carbon-black);
+
+  --finger-1: #e8ad3a;
+  --finger-2: #3ba5f7;
+  --finger-3: #c8adfd;
+  --finger-4: #97e4f9;
+  --finger-5: #cc79c0;
+
+  --viz-pc-0: #f84f4f; /* C */
+  --viz-pc-1: #f8964f; /* C♯ */
+  --viz-pc-2: #f8de4f; /* D */
+  --viz-pc-3: #caf84f; /* D♯ */
+  --viz-pc-4: #82f84f; /* E */
+  --viz-pc-5: #4ff863; /* F */
+  --viz-pc-6: #4ff8ab; /* F♯ */
+  --viz-pc-7: #4ff8f3; /* G */
+  --viz-pc-8: #4fb5f8; /* G♯ */
+  --viz-pc-9: #4f6df8; /* A */
+  --viz-pc-10: #784ff8; /* A♯ */
+  --viz-pc-11: #bf4ff8; /* B */
+  --viz-accent: #5cc8ff;
+  /* Additive light on dark; plain painting on light, where adding would wash out to white. */
+  --viz-blend: lighter;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}

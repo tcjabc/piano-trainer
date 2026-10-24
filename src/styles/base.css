@@ -1,0 +1,105 @@
+/* Reset and page-level type. All values come from tokens.css. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+:focus-visible {
+  outline: var(--border-divider) solid var(--color-focus);
+  outline-offset: var(--spacing-2);
+}
+
+/* Numbers that change (counts, timers) use the monospace stack with tabular figures. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-caption);
+}
+
+.heading {
+  font-size: var(--text-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-heading);
+}
+
+.subheading {
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.display {
+  font-size: var(--text-display);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+kbd {
+  display: inline-block;
+  min-width: var(--finger-badge-size);
+  padding: 0 var(--spacing-5);
+  border: var(--border-hairline) solid var(--color-border-strong);
+  border-radius: var(--radius-default);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  text-align: center;
+  color: var(--color-text);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-press: 0ms;
+    --duration-feedback: 0ms;
+    --duration-scroll: 0ms;
+  }
+}
