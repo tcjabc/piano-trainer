@@ -20,6 +20,7 @@ export const ICON_NAMES = [
   'upload',
   'chevron-right',
   'calendar-clock',
+  'check',
   'zoom-in',
   'zoom-out',
 ] as const;

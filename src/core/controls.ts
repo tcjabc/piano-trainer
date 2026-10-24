@@ -15,6 +15,7 @@ import { Emitter } from './emitter';
 export type ActionId =
   | 'area-play'
   | 'area-study'
+  | 'area-library'
   | 'start-pause'
   | 'restart'
   | 'next'
@@ -43,6 +44,7 @@ export interface ActionInfo {
 export const ACTIONS: readonly ActionInfo[] = [
   { id: 'area-play', label: 'Play area', hotkey: 'P' },
   { id: 'area-study', label: 'Study area', hotkey: 'T' },
+  { id: 'area-library', label: 'Library', hotkey: 'L' },
   { id: 'start-pause', label: 'Start / pause', hotkey: 'Space' },
   { id: 'restart', label: 'Restart card', hotkey: 'R' },
   { id: 'next', label: 'Skip / next', hotkey: '→' },

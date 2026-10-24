@@ -167,6 +167,12 @@ export class Keyboard extends Emitter<KeyboardEvents> {
     this.keys.get(note)?.classList.toggle('is-pressed', pressed);
   }
 
+  /** Mark the keys of a chord or scale being looked at (empty clears). */
+  setHighlights(notes: Iterable<number>): void {
+    for (const key of this.track.querySelectorAll('.is-highlight')) key.classList.remove('is-highlight');
+    for (const note of notes) this.keys.get(note)?.classList.add('is-highlight');
+  }
+
   /** Light a pressed key in a note colour (null turns it off). Used by the Play visualiser. */
   setLit(note: number, color: string | null): void {
     const key = this.keys.get(note);

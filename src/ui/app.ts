@@ -4,8 +4,9 @@
  * the keyboard, with the hand legend beside it in Study.
  *
  * Areas: Play (home: free playing, live staff, chord names, visualiser;
- * nothing is recorded) and Study (Today's review queue, and free practice
- * whose attempts are logged but never change the schedule).
+ * nothing is recorded), Study (Today's review queue, and free practice
+ * whose attempts are logged but never change the schedule) and Library
+ * (chords and scales to browse, hear and play along with).
  * Routes MIDI input to sound, the on-screen keyboard, Play and the drill;
  * learned controller buttons and knobs run actions through the same
  * shortcuts as the computer keyboard.
@@ -15,7 +16,7 @@ import { actionInfo, controls, describeBinding, shortBinding, type MidiMessage }
 import { DEFAULT_KEY_RANGE, keyRangeForDevice, midi, type KeyRange } from '../core/midi';
 import { notationReady } from '../core/notation';
 import { spellingToMidi } from '../core/pitch';
-import { noteDrillOptions, type HandChoice, type Settings } from '../core/settings';
+import { noteDrillOptions, type HandChoice, type LibrarySettings, type Settings } from '../core/settings';
 import { storage } from '../core/storage';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
@@ -23,6 +24,7 @@ import { NoteDrill } from '../modules/notes/drill';
 import { freeContents, freeRange, staffForHand } from '../modules/notes/free';
 import { FreePracticeView } from '../modules/notes/free-view';
 import { FreeSource, ReviewSource } from '../modules/notes/sources';
+import { LibraryView } from '../modules/library/library-view';
 import { PlayView } from '../modules/play/play-view';
 import { Visualiser } from '../modules/play/visualiser';
 import { h } from './dom';
@@ -38,7 +40,7 @@ import { TodayView } from './today';
 import { UpdateToast } from './update-toast';
 import { ZoomControl } from './zoom-control';
 
-type Screen = 'play' | 'today' | 'free' | 'drill' | 'settings';
+type Screen = 'play' | 'today' | 'free' | 'drill' | 'library' | 'settings';
 
 const SUSTAIN_CC = 64;
 /** MIDI channel 10 (drum channel), where controller pads usually send. */
@@ -82,6 +84,8 @@ export class App {
   private settingsView: SettingsView;
   private drill: NoteDrill;
   private studyNav = new StudyNav((view) => this.show(view));
+  private library: LibraryView;
+  private librarySaveTimer = 0;
   private free: FreePracticeView;
 
   constructor(private root: HTMLElement, settings: Settings) {
@@ -96,6 +100,12 @@ export class App {
     this.drill = new NoteDrill(this.staff, this.keyboard, {
       finished: () => this.show(this.drillKind === 'free' ? 'free' : 'today'),
     });
+    this.library = new LibraryView(
+      settings.library,
+      settings.hand,
+      { change: (library) => this.rememberLibrary(library), setHand: (hand) => void this.setHand(hand) },
+      this.keyboard,
+    );
     this.free = new FreePracticeView(settings.freePractice, {
       change: (freePractice) => void this.patchSettings({ freePractice }),
       start: () => this.startFree(),
@@ -203,6 +213,7 @@ export class App {
     this.keyboard.setZoom(s.keyboardZoom);
     this.keyboard.setShowNames(s.showKeyNames);
     this.free.setSettings(s.freePractice);
+    this.library.setSettings(s.library);
     controls.setBindings(s.controls);
     this.hotkeys.render();
     this.updateKeyboardRange();
@@ -235,6 +246,7 @@ export class App {
       if (this.screen === 'play') this.play.setHeld(this.held);
       if (this.screen === 'drill') this.drill.noteOn(note, time);
       if (this.screen === 'free' && this.free.picking) this.free.toggleKey(note);
+      if (this.screen === 'library') this.library.notePressed(note, this.held);
     };
     const midiNoteOn = (note: number, velocity: number, time: number) => {
       // Scroll to keys played on the MIDI keyboard (on-screen presses are already in view).
@@ -273,6 +285,7 @@ export class App {
   /** Go to an area's home screen: Play, or Today for Study (a running review session stays). */
   private showArea(area: Area): void {
     if (area === 'play' && this.screen !== 'play') this.show('play');
+    if (area === 'library' && this.screen !== 'library') this.show('library');
     const inReviews = this.screen === 'today' || (this.screen === 'drill' && this.drillKind === 'review');
     if (area === 'study' && !inReviews) this.show('today');
   }
@@ -287,7 +300,8 @@ export class App {
     if (this.screen === 'drill' && screen !== 'drill') this.drill.stop();
     if (this.screen === 'settings' && screen !== 'settings') this.settingsView.stopLearning(null);
     this.screen = screen;
-    if (screen !== 'settings') this.lastArea = screen === 'play' ? 'play' : 'study';
+    if (this.screen === 'library' && screen !== 'library') this.library.deactivate();
+    if (screen !== 'settings') this.lastArea = screen === 'play' ? 'play' : screen === 'library' ? 'library' : 'study';
     if (screen === 'today' || screen === 'free') this.lastStudy = screen;
     this.root.querySelector('.app')?.setAttribute('data-screen', screen);
     this.header.setArea(screen === 'settings' ? null : this.lastArea);
@@ -302,6 +316,10 @@ export class App {
       this.stage.replaceChildren(this.studyStage('today', this.today.el));
       this.setTodayHotkeys();
       void this.refreshSummary();
+    } else if (screen === 'library') {
+      this.stage.replaceChildren(this.library.el);
+      this.library.activate();
+      this.setLibraryHotkeys();
     } else if (screen === 'free') {
       this.stage.replaceChildren(this.studyStage('free', this.free.el));
       this.hotkeys.set([
@@ -328,7 +346,7 @@ export class App {
         ...this.commonHotkeys(),
       ]);
     } else {
-      const back: Screen = this.lastArea === 'play' ? 'play' : this.lastStudy;
+      const back: Screen = this.lastArea === 'study' ? this.lastStudy : this.lastArea;
       this.stage.replaceChildren(this.settingsView.el);
       this.hotkeys.set([
         { keys: ['Escape'], label: 'Esc', hint: back === 'play' ? 'Play' : 'Today', action: 'back', run: () => this.show(back) },
@@ -458,6 +476,7 @@ export class App {
       { keys: ['0'], label: '0', hint: '', hidden: true, run: () => this.zoom.fit() },
       { keys: ['p'], label: 'P', hint: '', hidden: true, action: 'area-play', run: () => this.showArea('play') },
       { keys: ['t'], label: 'T', hint: '', hidden: true, action: 'area-study', run: () => this.showArea('study') },
+      { keys: ['l'], label: 'L', hint: '', hidden: true, action: 'area-library', run: () => this.showArea('library') },
       { keys: ['e'], label: 'E', hint: '', hidden: true, run: () => this.show('free') },
       {
         keys: ['f'],
@@ -468,6 +487,31 @@ export class App {
         run: () => void this.patchSettings({ showFingerNumbers: !this.settings.showFingerNumbers }),
       },
     ];
+  }
+
+  private setLibraryHotkeys(): void {
+    this.hotkeys.set([
+      { keys: ['/'], label: '/', hint: 'Search', run: () => this.library.focusSearch() },
+      { keys: ['ArrowDown'], label: '↑ ↓', hint: 'Select', action: 'next', run: () => this.library.move(1) },
+      { keys: ['ArrowUp'], label: '↑', hint: '', hidden: true, action: 'previous', run: () => this.library.move(-1) },
+      { keys: ['h'], label: 'H', hint: 'Hear', action: 'hear', run: () => this.library.hear(false) },
+      { keys: ['a'], label: 'A', hint: 'Arpeggio', run: () => this.library.hear(true) },
+      { keys: ['Escape'], label: 'Esc', hint: '', hidden: true, action: 'back', run: () => this.library.clearSearch() },
+      ...this.handHotkeys(),
+      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
+      ...this.commonHotkeys(),
+    ]);
+  }
+
+  /**
+   * The Library's filter and selection change often (every arrow key), so
+   * they are kept without the full settings round trip and saved shortly after.
+   */
+  private rememberLibrary(library: LibrarySettings): void {
+    this.settings = { ...this.settings, library };
+    this.settingsView.setSettings(this.settings, false);
+    window.clearTimeout(this.librarySaveTimer);
+    this.librarySaveTimer = window.setTimeout(() => void storage.saveSettings(this.settings), 400);
   }
 
   /** Change and save a few settings without going through the settings screen. */
@@ -485,6 +529,7 @@ export class App {
     const next = { ...this.settings, hand };
     this.settingsView.setSettings(next);
     await this.updateSettings(next);
+    this.library.setHand(hand);
     if (this.screen === 'drill' && !(await this.startDrill(this.drillAhead))) this.show('today');
   }
 

@@ -1,4 +1,5 @@
 import type { ControlMap } from './controls';
+import { EMPTY_FILTER, type LibraryFilter } from './filter';
 import type { Clef } from './pitch';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -61,6 +62,15 @@ export interface FreePracticeSettings {
   notes: FreeNoteSettings;
 }
 
+/** The Library's remembered state. */
+export interface LibrarySettings {
+  filter: LibraryFilter;
+  /** Item id shown in the detail panel. */
+  selected: string | null;
+  /** Scales are shown, heard and added over this many octaves. */
+  octaves: 1 | 2;
+}
+
 export interface Settings {
   /** Selected MIDI input id; null means auto-select. */
   midiInputId: string | null;
@@ -78,6 +88,7 @@ export interface Settings {
   noteDrill: NoteDrillSettings;
   /** The last free-practice selection, remembered. */
   freePractice: FreePracticeSettings;
+  library: LibrarySettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -108,6 +119,7 @@ export const DEFAULT_SETTINGS: Settings = {
       specific: [],
     },
   },
+  library: { filter: EMPTY_FILTER, selected: null, octaves: 1 },
 };
 
 const CLEF_FOR_HAND: Record<HandChoice, ClefChoice> = { left: 'bass', right: 'treble', both: 'both' };
@@ -143,6 +155,11 @@ export function withDefaults(partial: LegacySettings | undefined): Settings {
     hand: partial?.hand ?? (legacyClef ? HAND_FOR_CLEF[legacyClef] : DEFAULT_SETTINGS.hand),
     visualiser: visualiserWithDefaults(partial?.visualiser),
     controls: { ...partial?.controls },
+    library: {
+      ...DEFAULT_SETTINGS.library,
+      ...partial?.library,
+      filter: { ...EMPTY_FILTER, ...partial?.library?.filter },
+    },
     freePractice: {
       ...DEFAULT_SETTINGS.freePractice,
       ...partial?.freePractice,

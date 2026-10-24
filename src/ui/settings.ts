@@ -61,9 +61,10 @@ export class SettingsView {
     this.render();
   }
 
-  setSettings(settings: Settings): void {
+  /** Take a new copy of the settings; `render` false just keeps the copy current (nothing on screen changes). */
+  setSettings(settings: Settings, render = true): void {
     this.settings = structuredClone(settings);
-    this.render();
+    if (render) this.render();
   }
 
   setDevices(devices: MidiDevice[], activeName: string | null, ports: string[]): void {

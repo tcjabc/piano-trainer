@@ -67,6 +67,19 @@ export function formatNoteName(text: string): DocumentFragment {
   return fragment;
 }
 
+/** Scale degrees with glyph accidentals, joined by en dashes: ["1", "b3", "5"] → 1–♭3–5. */
+export function formatDegrees(degrees: string[]): DocumentFragment {
+  const fragment = document.createDocumentFragment();
+  degrees.forEach((degree, i) => {
+    if (i > 0) fragment.append('\u2013');
+    const m = /^(bb|##|b|#)?(\d+)$/.exec(degree);
+    const acc = m?.[1];
+    if (acc) fragment.append(accidentalGlyph(ACCIDENTALS[acc]!));
+    fragment.append(m ? m[2]! : degree);
+  });
+  return fragment;
+}
+
 /** One accidental as a glyph element, e.g. for building labels by hand. */
 export function accidentalGlyph(accidental: Accidental): HTMLSpanElement {
   const span = document.createElement('span');

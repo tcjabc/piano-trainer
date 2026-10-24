@@ -1,14 +1,15 @@
-/** Slim app header: name, area tabs (Play / Study), MIDI status, sample loading, due count, settings. */
+/** Slim app header: name, area tabs (Play / Study / Library), MIDI status, sample loading, due count, settings. */
 import type { AudioLoad } from '../core/audio';
 import type { MidiStatus } from '../core/midi';
 import { h, icon } from './dom';
 
-/** Top-level areas. Library will be added later. */
-export type Area = 'play' | 'study';
+/** Top-level areas. */
+export type Area = 'play' | 'study' | 'library';
 
 const AREAS: { area: Area; label: string; hotkey: string }[] = [
   { area: 'play', label: 'Play', hotkey: 'P' },
   { area: 'study', label: 'Study', hotkey: 'T' },
+  { area: 'library', label: 'Library', hotkey: 'L' },
 ];
 
 export class Header {
