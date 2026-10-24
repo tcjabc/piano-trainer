@@ -1,6 +1,7 @@
 /** The staff panel: a card holding the notation, with feedback and pause states. */
 import { drawStaff, type NotationNote, type StaffKind } from '../core/notation';
 import { h } from './dom';
+import { setNoteText } from './note-text';
 
 export type StaffState = 'idle' | 'correct' | 'wrong' | 'paused';
 
@@ -24,7 +25,7 @@ export class StaffView {
 
   setState(state: StaffState, caption = ''): void {
     this.el.dataset.state = state;
-    this.caption.textContent = caption;
+    setNoteText(this.caption, caption);
   }
 
   /** Small text in the panel corner, e.g. cards left. */

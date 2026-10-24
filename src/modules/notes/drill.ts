@@ -7,7 +7,6 @@ import { audio } from '../../core/audio';
 import { autoGrade, recordReview, SessionQueue } from '../../core/scheduler';
 import type { NoteDrillOptions } from '../../core/settings';
 import { storage, type CardRecord } from '../../core/storage';
-import { displaySpelling } from '../../core/pitch';
 import type { StaffKind } from '../../core/notation';
 import { cssTimeMs } from '../../ui/dom';
 import type { Keyboard } from '../../ui/keyboard';
@@ -89,7 +88,7 @@ export class NoteDrill {
     } else {
       this.keyboard.flash(note, 'wrong');
       this.keyboard.setTarget(target);
-      this.staff.setState('wrong', `That was not it — play ${displaySpelling(this.card.content.spelling)}`);
+      this.staff.setState('wrong', `That was not it — play ${this.card.content.spelling}`);
     }
   }
 

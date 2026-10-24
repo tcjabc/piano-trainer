@@ -1022,3 +1022,26 @@ select.control {
 .update-toast[hidden] {
   display: none;
 }
+
+/* ── Accidentals in text ────────────────────────────────────────────────── */
+
+/*
+ * ♯ ♭ ♮ 𝄪 𝄫 from the SMuFL music font (Chillax has none). SMuFL glyphs are
+ * centred on their baseline, so they are raised to sit mid-way up the capitals;
+ * line-height 0 keeps the music font's tall metrics out of the line box.
+ */
+.acc {
+  font-family: 'Bravura', serif;
+  font-size: var(--acc-size);
+  font-style: normal;
+  font-weight: normal;
+  letter-spacing: 0;
+  line-height: 0;
+  vertical-align: var(--acc-raise);
+  margin: 0 var(--acc-gap) 0 var(--acc-gap);
+}
+
+.acc-flat,
+.acc-doubleFlat {
+  vertical-align: var(--acc-raise-flat);
+}

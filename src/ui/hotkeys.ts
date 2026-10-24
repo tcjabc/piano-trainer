@@ -5,6 +5,7 @@
  */
 import type { ActionId } from '../core/controls';
 import { h } from './dom';
+import { formatNoteName } from './note-text';
 
 export interface Hotkey {
   /** KeyboardEvent.key values that trigger it. */
@@ -53,7 +54,7 @@ export class Hotkeys {
             'span.hint',
             null,
             ...k.label.split(' ').map((key) => h('kbd', null, key)),
-            control ? h('span.hint-control', { title: `Mapped control: ${control}` }, control) : null,
+            control ? h('span.hint-control', { title: `Mapped control: ${control}` }, formatNoteName(control)) : null,
             h('span', null, k.hint),
           );
         }),

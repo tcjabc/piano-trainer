@@ -10,6 +10,7 @@ import { fingerColorVar, fingeringLabel, type Fingering } from '../core/fingerin
 import { isBlackKey, MIDDLE_C, midiToName, PIANO_HIGH, PIANO_LOW } from '../core/pitch';
 import { Emitter } from '../core/emitter';
 import { h } from './dom';
+import { formatNoteName } from './note-text';
 import { clampFirst, revealFirst, visibleForZoom, type Viewport } from './keyboard-viewport';
 
 export type KeyFlash = 'correct' | 'wrong';
@@ -53,7 +54,7 @@ export class Keyboard extends Emitter<KeyboardEvents> {
         { dataset: { note: String(note) }, 'aria-label': name },
         note % 12 === 0
           ? h(note === MIDDLE_C ? 'span.key-label.key-label-middle' : 'span.key-label', null, name)
-          : h('span.key-name', null, name.replace(/-?\d+$/, '').replace('#', '♯')),
+          : h('span.key-name', null, formatNoteName(name.replace(/-?\d+$/, ''))),
       );
       key.style.setProperty('--i', String(white));
       key.addEventListener('pointerdown', (e) => this.pointerDown(e, note));

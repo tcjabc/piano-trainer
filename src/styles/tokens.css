@@ -183,6 +183,13 @@
   --icon-size-sm: 14px;
   --control-height: 36px;
   --finger-badge-size: 20px;
+  /* Accidental glyphs in text (Bravura, measured against Chillax capitals):
+     at 0.9em a sharp is about cap height; raised so ♯ ♮ 𝄪 centre on the
+     capitals and ♭ 𝄫 rest just on the baseline. */
+  --acc-size: 0.9em;
+  --acc-raise: 0.38em;
+  --acc-raise-flat: 0.22em;
+  --acc-gap: 0.03em;
   --play-card-max-width: 960px;
   --play-overlay-width: 320px;
   --play-overlay-staff-height: 150px;

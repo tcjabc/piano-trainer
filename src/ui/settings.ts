@@ -4,6 +4,7 @@ import type { MidiDevice } from '../core/midi';
 import { naturalsBetween, formatSpelling, spellingToMidi, displaySpelling, type Clef } from '../core/pitch';
 import type { HandChoice, Settings, ThemePreference, VisualiserColors } from '../core/settings';
 import { h, icon } from './dom';
+import { formatNoteName } from './note-text';
 import type { IconName } from './icon-list';
 
 export interface SettingsActions {
@@ -253,7 +254,7 @@ export class SettingsView {
       const status = learning
         ? h('span.control-learning', { role: 'status' }, 'Press a control on your keyboard… ', h('kbd', null, 'Esc'), ' to cancel')
         : binding
-          ? h('span.control-name', null, describeBinding(binding, mainPort))
+          ? h('span.control-name', null, formatNoteName(describeBinding(binding, mainPort)))
           : h('span.control-name.muted', null, 'Not set');
       const mode =
         a.continuous && binding && !learning
@@ -301,7 +302,11 @@ export class SettingsView {
         this.ports.length ? `Listening on: ${this.ports.join(', ')}.` : 'No controller connected.',
       ),
       this.controlsMessage
-        ? h(this.controlsMessage.warn ? 'p.controls-message.is-warning' : 'p.controls-message', { role: 'status' }, this.controlsMessage.text)
+        ? h(
+            this.controlsMessage.warn ? 'p.controls-message.is-warning' : 'p.controls-message',
+            { role: 'status' },
+            formatNoteName(this.controlsMessage.text),
+          )
         : null,
       h('div.control-list', null, ...rows),
     );

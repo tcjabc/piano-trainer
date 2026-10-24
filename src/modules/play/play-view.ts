@@ -4,9 +4,10 @@
  * Nothing here is scored or recorded.
  */
 import { drawStaff, GRAND_STAFF_HEIGHT, STAVE_MARGIN, type NotationNote } from '../../core/notation';
-import { displaySpelling, MIDDLE_C, spellingToMidi } from '../../core/pitch';
+import { MIDDLE_C, spellingToMidi } from '../../core/pitch';
 import { h } from '../../ui/dom';
-import { detectChord, prettyChord, spellHeld } from './harmony';
+import { setNoteText } from '../../ui/note-text';
+import { detectChord, spellHeld } from './harmony';
 
 /** Stave width limits; within them the stave takes the drawing area's proportions so it fills the card. */
 const MIN_STAVE_WIDTH = 300;
@@ -70,9 +71,9 @@ export class PlayView {
     this.staveWidth = this.fittedStaveWidth();
     drawStaff(this.drawing, 'grand', [...byClef('treble'), ...byClef('bass')], { staveWidth: this.staveWidth });
 
-    this.notesEl.textContent = spellings.length ? spellings.map(displaySpelling).join('  ') : 'Play something';
+    setNoteText(this.notesEl, spellings.length ? spellings.join('  ') : 'Play something');
     this.notesEl.classList.toggle('muted', spellings.length === 0);
-    this.chordSymbol.textContent = chord ? prettyChord(chord.symbol) : '';
-    this.chordName.textContent = chord ? prettyChord(chord.name) : '';
+    setNoteText(this.chordSymbol, chord ? chord.symbol : '');
+    setNoteText(this.chordName, chord ? chord.name : '');
   }
 }

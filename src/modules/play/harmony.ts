@@ -58,11 +58,6 @@ export function detectChord(midis: number[]): DetectedChord | null {
   return { symbol, name: chord.name, notes: chord.notes };
 }
 
-/** Chord symbol with real accidental glyphs: "Bb7/F" → "B♭7/F". */
-export function prettyChord(symbol: string): string {
-  return symbol.replace(/([A-G])#/g, '$1♯').replace(/([A-G])b/g, '$1♭');
-}
-
 /**
  * Spell held notes for the staff: by the chord's spelling when there is one
  * (so E♭ major shows E♭, not D♯), otherwise with sharps. Low to high.
