@@ -169,7 +169,7 @@ export class App {
     applyTheme(s.theme);
     this.visualiser.refreshTokens();
     this.visualiser.setMode(s.visualiser.colors);
-    this.visualiser.setSparks(s.visualiser.sparks);
+    this.visualiser.setEmbers(s.visualiser.sparks);
     this.hands.set(s.hand);
     this.hands.setNumbersVisible(s.showFingerNumbers);
     this.zoom.set(s.keyboardZoom);
@@ -181,11 +181,20 @@ export class App {
     this.updateVisualiser();
   }
 
-  /** The visualiser runs only in Play, when switched on. */
+  /** The visualiser runs only in Play, when switched on; it then takes over the stage. */
   private updateVisualiser(): void {
     const on = this.screen === 'play' && this.settings.visualiser.enabled;
-    this.root.querySelector('.app')?.toggleAttribute('data-visualiser', on);
+    const app = this.root.querySelector('.app');
+    app?.toggleAttribute('data-visualiser', on);
+    app?.toggleAttribute('data-overlay-off', !this.settings.visualiser.overlay);
     this.visualiser.setActive(on);
+    // Re-colour lit keys for the current preset, or clear them.
+    this.keyboard.clearLit();
+    if (on) for (const note of this.held) this.keyboard.setLit(note, this.visualiser.colorFor(note));
+  }
+
+  private get visualiserOn(): boolean {
+    return this.screen === 'play' && this.settings.visualiser.enabled;
   }
 
   private wireInput(): void {
@@ -194,6 +203,7 @@ export class App {
       this.keyboard.setPressed(note, true);
       this.held.add(note);
       this.visualiser.noteOn(note, velocity);
+      if (this.visualiserOn) this.keyboard.setLit(note, this.visualiser.colorFor(note));
       if (this.screen === 'play') this.play.setHeld(this.held);
       if (this.screen === 'drill') this.drill.noteOn(note, time);
     };
@@ -207,6 +217,7 @@ export class App {
       this.keyboard.setPressed(note, false);
       this.held.delete(note);
       this.visualiser.noteOff(note);
+      this.keyboard.setLit(note, null);
       if (this.screen === 'play') this.play.setHeld(this.held);
     };
 
@@ -291,6 +302,13 @@ export class App {
         label: 'N',
         hint: s.showKeyNames ? 'Hide key names' : 'Key names',
         run: () => void this.patchSettings({ showKeyNames: !this.settings.showKeyNames }),
+      },
+      {
+        keys: ['o'],
+        label: 'O',
+        hint: s.visualiser.overlay ? 'Hide staff' : 'Show staff',
+        hidden: !s.visualiser.enabled,
+        run: () => void this.patchSettings({ visualiser: { ...this.settings.visualiser, overlay: !this.settings.visualiser.overlay } }),
       },
       { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
       ...this.commonHotkeys(),

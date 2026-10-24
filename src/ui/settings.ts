@@ -147,22 +147,30 @@ export class SettingsView {
             'viz-colors',
             [
               { value: 'rainbow', label: 'Rainbow' },
+              { value: 'neon', label: 'Neon' },
+              { value: 'ice', label: 'Ice' },
               { value: 'accent', label: 'Single colour' },
-              { value: 'fingers', label: 'Fingers' },
             ],
             s.visualiser.colors,
             (v) => this.commit((x) => (x.visualiser.colors = v)),
           ),
         ),
         field(
-          'Sparks',
-          checkbox(s.visualiser.sparks, (v) => this.commit((x) => (x.visualiser.sparks = v)), 'Small spark burst on each note'),
+          'Particles',
+          checkbox(s.visualiser.sparks, (v) => this.commit((x) => (x.visualiser.sparks = v)), 'Embers rise from the keys you play'),
+        ),
+        field(
+          'Staff overlay',
+          checkbox(
+            s.visualiser.overlay,
+            (v) => this.commit((x) => (x.visualiser.overlay = v)),
+            'Show the staff and note names over the visualiser (O)',
+          ),
         ),
         h(
           'p.muted.field-note',
           null,
-          'Finger colours apply once fingering is available; until then bars use the single colour. ',
-          'When your system asks for reduced motion, bars fade in place and sparks are off.',
+          'When your system asks for reduced motion, bars fade in place and there are no particles.',
         ),
       ),
       section(

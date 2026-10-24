@@ -19,4 +19,9 @@ describe('settings', () => {
   it('prefers a stored hand over a legacy clef', () => {
     expect(withDefaults({ hand: 'both', noteDrill: { clef: 'treble' } }).hand).toBe('both');
   });
+
+  it('replaces the retired "fingers" visualiser colours and adds the overlay setting', () => {
+    const legacy = { visualiser: { enabled: true, colors: 'fingers', sparks: false } } as unknown as Parameters<typeof withDefaults>[0];
+    expect(withDefaults(legacy).visualiser).toEqual({ enabled: true, colors: 'rainbow', sparks: false, overlay: true });
+  });
 });

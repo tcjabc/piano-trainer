@@ -35,11 +35,22 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | Key | Action |
 | --- | --- |
 | V | Visualiser on/off |
+| O | Staff overlay on/off (with the visualiser) |
 | N | Note names on every on-screen key |
 | S | Settings |
 | - / = / 0 | Zoom the keyboard out / in / fit |
 
-The **visualiser** sits between the staff and the keyboard. A glowing bar rises from each key you press and grows while you hold it. When you let go it drifts upward and fades. The sustain pedal keeps bars held. Velocity makes bars slightly brighter and wider. Colours (Settings → Play): rainbow by pitch class (C red … B violet), a single colour, or finger colours (once fingering exists; until then the single colour). Sparks on note-on can be turned off. With the system's reduced-motion setting, bars fade in place and there are no sparks. It's the only place in the app that uses strong colour.
+With the visualiser off, the Play card fills the stage and the staff is sized to the card's shape.
+
+With the **visualiser** on (V), it becomes the stage: everything between the header and the keyboard, always dark, even in light theme. The staff and note readout shrink to a translucent overlay in the top-left corner (O hides it; remembered).
+
+- **Bars:** rounded pills about 80% of the key's width, drawn as a near-white core inside a soft glow in the note's colour. Each is born at the keyboard edge and grows while the key, or the sustain pedal, holds it. On release it rises at a steady speed off the top, fading only in the top 15% of the stage. Striking a key again while its bar is still attached leaves a small gap.
+- **Keyboard edge:** a thin glowing horizon line runs along the keyboard's top edge and flashes in each new note's colour. Pressed keys light up in that colour: white keys tinted, black keys more strongly.
+- **Particles** (a separate setting): embers burst from the key on note-on (more at higher velocity) and trickle up while it's held. They drift, flicker, shrink and fade over 1–2 s.
+- **Colour presets** (Settings → Play): Rainbow by pitch class (C red … B violet), Neon (hot pink), Ice (cyan/blue) or a single accent colour.
+- **Reduced motion:** with the system's reduced-motion setting, bars fade in place and there are no particles.
+
+It's the only place in the app that uses strong colour. Glow is pre-rendered once per colour into small sprites and drawn with additive blending (no per-frame blur). Particles are capped at 600, and the canvas is limited to 2× pixel density.
 
 ### Study
 

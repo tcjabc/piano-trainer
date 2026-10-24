@@ -48,6 +48,10 @@ const TOP_MARGIN = 30;
 const STAVE_GAP = 80;
 const SINGLE_HEIGHT = 150;
 const GRAND_HEIGHT = 240;
+/** Drawing height of a grand staff, for callers that size the stave to a box. */
+export const GRAND_STAFF_HEIGHT = GRAND_HEIGHT;
+/** Space left of the stave in the drawing (margin and brace). */
+export const STAVE_MARGIN = 20;
 /** Vertical distance between stacked finger numbers. */
 const FINGER_STACK_STEP = 12;
 
@@ -113,10 +117,15 @@ function centreSingleNote(notes: StaveNote[], stave: Stave): void {
  * Render notes into `container`, replacing what was there. Notes on a clef
  * that is not shown are ignored.
  */
-export function drawStaff(container: HTMLElement, staff: StaffKind, notes: NotationNote[]): void {
+export function drawStaff(
+  container: HTMLElement,
+  staff: StaffKind,
+  notes: NotationNote[],
+  { staveWidth = STAVE_WIDTH }: { staveWidth?: number } = {},
+): void {
   container.replaceChildren();
   const height = staff === 'grand' ? GRAND_HEIGHT : SINGLE_HEIGHT;
-  const width = STAVE_WIDTH + STAVE_X * 2;
+  const width = staveWidth + STAVE_X * 2;
   const renderer = new Renderer(container as HTMLDivElement, Renderer.Backends.SVG);
   renderer.resize(width, height);
   const ctx = renderer.getContext();
@@ -125,10 +134,10 @@ export function drawStaff(container: HTMLElement, staff: StaffKind, notes: Notat
 
   const staves: Partial<Record<Clef, Stave>> = {};
   if (staff === 'grand') {
-    staves.treble = new Stave(STAVE_X + 20, TOP_MARGIN - 10, STAVE_WIDTH - 20).addClef('treble');
-    staves.bass = new Stave(STAVE_X + 20, TOP_MARGIN - 10 + STAVE_GAP, STAVE_WIDTH - 20).addClef('bass');
+    staves.treble = new Stave(STAVE_X + 20, TOP_MARGIN - 10, staveWidth - 20).addClef('treble');
+    staves.bass = new Stave(STAVE_X + 20, TOP_MARGIN - 10 + STAVE_GAP, staveWidth - 20).addClef('bass');
   } else {
-    staves[staff] = new Stave(STAVE_X, TOP_MARGIN, STAVE_WIDTH).addClef(staff);
+    staves[staff] = new Stave(STAVE_X, TOP_MARGIN, staveWidth).addClef(staff);
   }
   for (const s of Object.values(staves)) s.setContext(ctx).draw();
 

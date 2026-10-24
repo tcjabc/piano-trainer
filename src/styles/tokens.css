@@ -86,29 +86,53 @@
   --finger-4: #087692; /* petrol */
   --finger-5: #8e3a6a; /* plum   */
 
-  /* ── Visualiser (Play) — the one place strong colour is allowed ───── */
-  /* Rainbow by pitch class, C = red … B = violet. */
-  --viz-pc-0: #ce2222; /* C */
-  --viz-pc-1: #ce6b22; /* C♯ */
-  --viz-pc-2: #ceb422; /* D */
-  --viz-pc-3: #9fce22; /* D♯ */
-  --viz-pc-4: #56ce22; /* E */
-  --viz-pc-5: #22ce36; /* F */
-  --viz-pc-6: #22ce80; /* F♯ */
-  --viz-pc-7: #22cec9; /* G */
-  --viz-pc-8: #228ace; /* G♯ */
-  --viz-pc-9: #2241ce; /* A */
-  --viz-pc-10: #4b22ce; /* A♯ */
-  --viz-pc-11: #9522ce; /* B */
-  --viz-accent: #1f7fd1;
-  /* Additive light on dark; plain painting on light, where adding would wash out to white. */
-  --viz-blend: source-over;
-  /* Motion, read by the canvas code (plain numbers: px/s, ms, px). */
-  --viz-rise-speed: 150;
-  --viz-fade-ms: 1800;
+  /* ── Play stage (visualiser) — always dark, in both themes ────────── */
+  --stage-bg: #050608;
+  --stage-text: #f1f2f3;
+  --stage-text-muted: #8f8f8f;
+  --stage-border: rgba(241, 242, 243, 0.14);
+  --stage-overlay-bg: rgba(18, 19, 22, 0.62);
+  --stage-overlay-blur: 10px;
+
+  /* Visualiser colours — the one place strong colour is allowed.
+     Rainbow by pitch class, C = red … B = violet. */
+  --viz-pc-0: #f84f4f; /* C */
+  --viz-pc-1: #f8964f; /* C♯ */
+  --viz-pc-2: #f8de4f; /* D */
+  --viz-pc-3: #caf84f; /* D♯ */
+  --viz-pc-4: #82f84f; /* E */
+  --viz-pc-5: #4ff863; /* F */
+  --viz-pc-6: #4ff8ab; /* F♯ */
+  --viz-pc-7: #4ff8f3; /* G */
+  --viz-pc-8: #4fb5f8; /* G♯ */
+  --viz-pc-9: #4f6df8; /* A */
+  --viz-pc-10: #784ff8; /* A♯ */
+  --viz-pc-11: #bf4ff8; /* B */
+  --viz-neon: #ff2d6f; /* hot pink/red glow */
+  --viz-ice: #38c8ff; /* cyan/blue glow */
+  --viz-accent: #b08cff; /* single accent */
+  /* Bar core: near-white, mixed this much toward the note colour. */
+  --viz-core-tint: 0.18;
+
+  /* Visualiser geometry and motion, read by the canvas code (plain numbers). */
+  --viz-rise-speed: 190; /* px per second */
+  --viz-bar-width: 0.8; /* of the key width */
+  --viz-core-width: 0.42; /* of the bar width */
+  --viz-glow-spread: 0.9; /* glow beyond the bar, in bar widths */
+  --viz-fade-zone: 0.15; /* top part of the stage where bars fade out */
+  --viz-repress-gap: 6; /* px between bars when a key is struck again */
+  --viz-horizon-flash-ms: 450;
   --viz-reduced-fade-ms: 500;
-  --viz-glow: 16;
-  --viz-spark-count: 10;
+  --viz-ember-max: 600;
+  --viz-ember-burst: 22; /* at full velocity */
+  --viz-ember-trickle: 7; /* per second per held note */
+  --viz-ember-life-ms: 1500;
+  --viz-max-dpr: 2;
+
+  /* Pressed keys in Play with the visualiser: how strongly they take the note colour. */
+  --key-lit-white: 38%;
+  --key-lit-black: 72%;
+  --key-lit-glow: 14px;
 
   /* ── Typography ───────────────────────────────────────────────────── */
   --font-ui: 'Chillax', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -171,9 +195,9 @@
   --icon-size-sm: 14px;
   --control-height: 36px;
   --finger-badge-size: 20px;
-  --play-staff-height: 180px;
-  /* Stage and panel padding plus the note and chord readout. */
-  --play-chrome-height: 260px;
+  --play-card-max-width: 960px;
+  --play-overlay-width: 320px;
+  --play-overlay-staff-height: 150px;
   --hand-size: clamp(80px, calc(var(--keyboard-height) - var(--spacing-30)), 104px);
   /* Fingertip numbers, in the hand icon's 24-unit coordinate space. */
   --hand-number-size: 2px;
@@ -227,21 +251,6 @@
     --finger-4: #97e4f9;
     --finger-5: #cc79c0;
 
-    --viz-pc-0: #f84f4f; /* C */
-    --viz-pc-1: #f8964f; /* C♯ */
-    --viz-pc-2: #f8de4f; /* D */
-    --viz-pc-3: #caf84f; /* D♯ */
-    --viz-pc-4: #82f84f; /* E */
-    --viz-pc-5: #4ff863; /* F */
-    --viz-pc-6: #4ff8ab; /* F♯ */
-    --viz-pc-7: #4ff8f3; /* G */
-    --viz-pc-8: #4fb5f8; /* G♯ */
-    --viz-pc-9: #4f6df8; /* A */
-    --viz-pc-10: #784ff8; /* A♯ */
-    --viz-pc-11: #bf4ff8; /* B */
-    --viz-accent: #5cc8ff;
-    /* Additive light on dark; plain painting on light, where adding would wash out to white. */
-    --viz-blend: lighter;
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
     color-scheme: dark;
   }
@@ -281,21 +290,6 @@
   --finger-4: #97e4f9;
   --finger-5: #cc79c0;
 
-  --viz-pc-0: #f84f4f; /* C */
-  --viz-pc-1: #f8964f; /* C♯ */
-  --viz-pc-2: #f8de4f; /* D */
-  --viz-pc-3: #caf84f; /* D♯ */
-  --viz-pc-4: #82f84f; /* E */
-  --viz-pc-5: #4ff863; /* F */
-  --viz-pc-6: #4ff8ab; /* F♯ */
-  --viz-pc-7: #4ff8f3; /* G */
-  --viz-pc-8: #4fb5f8; /* G♯ */
-  --viz-pc-9: #4f6df8; /* A */
-  --viz-pc-10: #784ff8; /* A♯ */
-  --viz-pc-11: #bf4ff8; /* B */
-  --viz-accent: #5cc8ff;
-  /* Additive light on dark; plain painting on light, where adding would wash out to white. */
-  --viz-blend: lighter;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
   color-scheme: dark;
 }

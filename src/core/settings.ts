@@ -5,14 +5,17 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 export type ClefChoice = Clef | 'both';
 /** Which hand is practised. */
 export type HandChoice = 'left' | 'right' | 'both';
-/** Visualiser bar colours: by pitch class, one accent colour, or finger colours (when fingering is known). */
-export type VisualiserColors = 'rainbow' | 'accent' | 'fingers';
+/** Visualiser colour presets: by pitch class, hot pink/red, cyan/blue, or one accent colour. */
+export type VisualiserColors = 'rainbow' | 'neon' | 'ice' | 'accent';
+const VISUALISER_COLORS: readonly VisualiserColors[] = ['rainbow', 'neon', 'ice', 'accent'];
 
 export interface VisualiserSettings {
   enabled: boolean;
   colors: VisualiserColors;
-  /** Spark burst on note-on (always off when the system asks for reduced motion). */
+  /** Ember particles (always off when the system asks for reduced motion). */
   sparks: boolean;
+  /** Compact staff and note readout over the visualiser stage. */
+  overlay: boolean;
 }
 
 export interface NoteRange {
@@ -60,7 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showFingerNumbers: true,
   keyboardZoom: 0,
   showKeyNames: false,
-  visualiser: { enabled: false, colors: 'rainbow', sparks: true },
+  visualiser: { enabled: false, colors: 'rainbow', sparks: true, overlay: true },
   controls: {},
   noteDrill: {
     treble: { low: 'C4', high: 'G4' },
@@ -83,6 +86,13 @@ type LegacySettings = Omit<Partial<Settings>, 'noteDrill'> & {
   noteDrill?: Partial<NoteDrillSettings> & { clef?: ClefChoice };
 };
 
+function visualiserWithDefaults(partial: Partial<VisualiserSettings> | undefined): VisualiserSettings {
+  const merged = { ...DEFAULT_SETTINGS.visualiser, ...partial };
+  // An earlier version offered "fingers"; anything unknown falls back to rainbow.
+  if (!VISUALISER_COLORS.includes(merged.colors)) merged.colors = 'rainbow';
+  return merged;
+}
+
 /** Fill in any missing fields (e.g. after an app update adds a setting) and migrate old ones. */
 export function withDefaults(partial: LegacySettings | undefined): Settings {
   const { clef: legacyClef, ...noteDrill } = partial?.noteDrill ?? {};
@@ -91,7 +101,7 @@ export function withDefaults(partial: LegacySettings | undefined): Settings {
     ...partial,
     // Before the hand setting existed, the clef was stored with the drill options.
     hand: partial?.hand ?? (legacyClef ? HAND_FOR_CLEF[legacyClef] : DEFAULT_SETTINGS.hand),
-    visualiser: { ...DEFAULT_SETTINGS.visualiser, ...partial?.visualiser },
+    visualiser: visualiserWithDefaults(partial?.visualiser),
     controls: { ...partial?.controls },
     noteDrill: {
       ...DEFAULT_SETTINGS.noteDrill,

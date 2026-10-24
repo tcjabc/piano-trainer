@@ -166,6 +166,18 @@ export class Keyboard extends Emitter<KeyboardEvents> {
     this.keys.get(note)?.classList.toggle('is-pressed', pressed);
   }
 
+  /** Light a pressed key in a note colour (null turns it off). Used by the Play visualiser. */
+  setLit(note: number, color: string | null): void {
+    const key = this.keys.get(note);
+    if (!key) return;
+    key.classList.toggle('is-lit', color !== null);
+    if (color) key.style.setProperty('--key-glow', color);
+  }
+
+  clearLit(): void {
+    for (const key of this.track.querySelectorAll('.is-lit')) key.classList.remove('is-lit');
+  }
+
   /** Brief feedback colour on a key. */
   flash(note: number, kind: KeyFlash, ms = 500): void {
     const key = this.keys.get(note);
