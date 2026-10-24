@@ -122,7 +122,11 @@ export function matchesFilter(item: LibraryItem, f: LibraryFilter): boolean {
 
 export function filterItems(f: LibraryFilter, query = ''): LibraryItem[] {
   const parsed = parseQuery(query);
-  return allItems().filter((item) => matchesFilter(item, f) && matchesQuery(item, parsed));
+  const items = allItems().filter((item) => matchesFilter(item, f) && matchesQuery(item, parsed));
+  if (!parsed.orScale) return items;
+  // "Eb major": the chord itself, then the scale, then the inversions.
+  const rank = (item: LibraryItem) => (item.kind === 'scale' ? 1 : item.spec.inversion === 0 ? 0 : 2);
+  return items.sort((a, b) => rank(a) - rank(b));
 }
 
 // ── Search ─────────────────────────────────────────────────────────────
@@ -134,6 +138,8 @@ export interface ParsedQuery {
   /** Bass note from a slash chord ("C/E"); resolved to an inversion per item. */
   bass?: string;
   scaleType?: ScaleType;
+  /** The words name a scale as well as the chord ("Eb major", "A minor"): list both. */
+  orScale?: ScaleType;
   kind?: ItemKind;
   /** Anything not understood, matched against item names. */
   words: string[];
@@ -155,6 +161,12 @@ const SCALE_WORDS: [string, ScaleType][] = [
   ['minor scale', 'natural minor'],
   ...SCALE_TYPES.filter((t) => t.group !== 'major/minor').map((t) => [t.name, t.id] as [string, ScaleType]),
 ];
+
+/** Quality words that are also scale names: "Eb major" is a chord and a scale. */
+const SCALE_FOR_QUALITY_WORD: Record<string, ScaleType> = {
+  major: 'major',
+  minor: 'natural minor',
+};
 
 /** Words for qualities that tonal's symbol parser doesn't take. */
 const QUALITY_WORDS: [RegExp, ChordQuality][] = [
@@ -234,8 +246,10 @@ export function parseQuery(query: string): ParsedQuery {
   if (remainder && parsed.kind !== 'scale') {
     const quality = parsed.root ? qualityOf(parsed.root, remainder) : undefined;
     if (quality) {
+      const scale = SCALE_FOR_QUALITY_WORD[remainder.toLowerCase()];
+      if (scale && parsed.kind === undefined && parsed.inversion === undefined && !parsed.bass) parsed.orScale = scale;
+      else parsed.kind = 'chord';
       parsed.quality = quality;
-      parsed.kind = 'chord';
       return parsed;
     }
     // A quality on its own ("add9", "dim", "7") can start with a note letter.
@@ -274,6 +288,8 @@ export function matchesQuery(item: LibraryItem, p: ParsedQuery): boolean {
     if (p.bass && item.symbol.split('/')[1] !== p.bass && !(item.spec.inversion === 0 && item.spec.root === p.bass)) {
       return false;
     }
+  } else if (p.orScale) {
+    if (item.tonic !== p.root || item.type !== p.orScale) return false;
   } else {
     if (p.quality || p.inversion !== undefined || p.bass) return false;
     if (p.root && item.tonic !== p.root) return false;

@@ -3,8 +3,9 @@
  * accidentals are drawn with the SMuFL music font (Bravura) that VexFlow
  * already loads, sized and raised to sit with the text (see `.acc` in CSS).
  *
- * Use formatNoteName for any text that can contain note names: "C#4",
- * "Bb7/F", "E♭ major", "That was not it — play F#3".
+ * Use formatNoteName for any text that can contain note names or chord
+ * symbols: "C#4", "Bb7/F", "Bbm7b5", "C7(#9)", "E♭ major", "That was not
+ * it — play F#3".
  */
 
 /** SMuFL code points (Standard Music Font Layout, "Standard accidentals"). */
@@ -39,20 +40,26 @@ const ACCIDENTALS: Record<string, Accidental> = {
 };
 
 /**
- * A note letter (at the start or after a non-letter, so words like "Bob" are
- * left alone) followed by an accidental, written in ASCII or Unicode.
+ * Either a note letter (at the start or after a non-letter, so words like
+ * "Bob" are left alone) followed by an accidental, written in ASCII or
+ * Unicode; or an altered extension in a chord symbol: ♭5 ♯5 ♭9 ♯9 ♯11 ♭13
+ * after a digit or a bracket ("m7b5", "7#9", "7(b13)").
  */
-const NOTE_ACCIDENTAL = /(^|[^A-Za-z])([A-G])(##|bb|\u{1D12A}|\u{1D12B}|#|♯|b|♭|♮)/gu;
+const NOTE_ACCIDENTAL =
+  /(^|[^A-Za-z])([A-G])(##|bb|\u{1D12A}|\u{1D12B}|#|♯|b|♭|♮)|([0-9(])(#|♯|b|♭)(?=(?:5|9|11|13)(?![0-9]))/gu;
 
 /** Split text into plain runs and accidentals: "Bb7/F#" → ["B", flat, "7/F", sharp]. */
 export function splitNoteText(text: string): (string | { accidental: Accidental })[] {
   const parts: (string | { accidental: Accidental })[] = [];
   let last = 0;
   for (const match of text.matchAll(NOTE_ACCIDENTAL)) {
-    const [, before, letter, written] = match;
-    const start = match.index! + before!.length;
-    parts.push(text.slice(last, start) + letter, { accidental: ACCIDENTALS[written!]! });
-    last = start + letter!.length + written!.length;
+    const [, before, letter, written, extBefore, extWritten] = match;
+    // Kept before the glyph: the note letter, or the digit/bracket before an extension.
+    const kept = letter ?? extBefore!;
+    const start = match.index! + (letter ? before!.length : 0);
+    const accidental = written ?? extWritten!;
+    parts.push(text.slice(last, start) + kept, { accidental: ACCIDENTALS[accidental]! });
+    last = start + kept.length + accidental.length;
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts;

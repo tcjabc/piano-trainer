@@ -44,6 +44,22 @@ describe('search', () => {
     expect(names('Eb harmonic minor')).toEqual(['Eb harmonic minor']);
   });
 
+  it('lists the chord and the scale for a root and "major" or "minor"', () => {
+    expect(parseQuery('Eb major')).toMatchObject({ root: 'Eb', quality: 'M', orScale: 'major' });
+    expect(parseQuery('Eb major').kind).toBeUndefined();
+    expect(names('Eb major')).toEqual(['Eb', 'Eb major', 'Eb/G', 'Eb/Bb']);
+    expect(names('a minor')).toEqual(['Am', 'A natural minor', 'Am/C', 'Am/E']);
+    expect(names('E♭ major')).toEqual(['Eb', 'Eb major', 'Eb/G', 'Eb/Bb']);
+  });
+
+  it('keeps chord-only searches to chords', () => {
+    expect(names('Ebmaj')).toEqual(['Eb', 'Eb/G', 'Eb/Bb']);
+    expect(names('Eb major 1st inv')).toEqual(['Eb/G']);
+    expect(names('Eb major chord')).toEqual(['Eb', 'Eb/G', 'Eb/Bb']);
+    expect(names('Eb major/G')).toEqual(['Eb/G']);
+    expect(names('Eb major', { ...EMPTY_FILTER, kinds: ['scale'] })).toEqual(['Eb major']);
+  });
+
   it('reads a quality on its own', () => {
     expect(parseQuery('add9')).toMatchObject({ quality: 'add9', root: undefined });
     expect(parseQuery('half diminished')).toMatchObject({ quality: 'm7b5' });
