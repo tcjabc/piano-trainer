@@ -20,14 +20,18 @@ import { noteDrillOptions, type HandChoice, type LibrarySettings, type Settings 
 import { storage } from '../core/storage';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
-import { NoteDrill } from '../modules/notes/drill';
+import { Drill } from '../modules/drill/drill';
+import { itemContent, noteItem, type DrillItem, type DrillOptions } from '../modules/drill/items';
+import { FreeSource, ReviewSource } from '../modules/drill/sources';
+import { HAND_LABELS } from '../modules/drill/tasks';
 import { freeContents, freeRange, staffForHand } from '../modules/notes/free';
 import { FreePracticeView } from '../modules/notes/free-view';
-import { FreeSource, ReviewSource } from '../modules/notes/sources';
+import { filterItems, type ItemKind, type LibraryItem } from '../modules/library/catalog';
 import { LibraryView } from '../modules/library/library-view';
+import { relativeDue, ReviewIndex } from '../modules/library/review-index';
 import { PlayView } from '../modules/play/play-view';
 import { Visualiser } from '../modules/play/visualiser';
-import { h } from './dom';
+import { h, icon } from './dom';
 import { HandLegend } from './hand-legend';
 import { Header, type Area } from './header';
 import { Hotkeys, type Hotkey } from './hotkeys';
@@ -41,6 +45,9 @@ import { UpdateToast } from './update-toast';
 import { ZoomControl } from './zoom-control';
 
 type Screen = 'play' | 'today' | 'free' | 'drill' | 'library' | 'settings';
+
+/** Library items that can be added to review and drilled (scales join with their drill). */
+const REVIEWABLE: ReadonlySet<ItemKind> = new Set(['chord']);
 
 const SUSTAIN_CC = 64;
 /** MIDI channel 10 (drum channel), where controller pads usually send. */
@@ -61,6 +68,10 @@ export class App {
   private drillAhead = false;
   /** What the running drill is: today's reviews or free practice. */
   private drillKind: 'review' | 'free' = 'review';
+  /** Where Esc (and the end of the cards) takes a drill back to. */
+  private drillReturn: 'today' | 'free' | 'library' = 'today';
+  /** Which chords and scales are in review. */
+  private reviews = new ReviewIndex();
   /** The Study screen to return to from settings. */
   private lastStudy: 'today' | 'free' = 'today';
   /** Keys of the connected keyboard (or the 61-key default). */
@@ -82,7 +93,7 @@ export class App {
   private staff = new StaffView();
   private today = new TodayView({ start: () => this.startDrill(false), practiseAhead: () => this.startDrill(true) });
   private settingsView: SettingsView;
-  private drill: NoteDrill;
+  private drill: Drill;
   private studyNav = new StudyNav((view) => this.show(view));
   private library: LibraryView;
   private librarySaveTimer = 0;
@@ -97,8 +108,8 @@ export class App {
       learnControl: (action) => controls.learn(action),
       cancelLearn: () => controls.cancelLearn(),
     });
-    this.drill = new NoteDrill(this.staff, this.keyboard, {
-      finished: () => this.show(this.drillKind === 'free' ? 'free' : 'today'),
+    this.drill = new Drill(this.staff, this.keyboard, {
+      finished: () => this.show(this.drillReturn),
     });
     this.library = new LibraryView(
       settings.library,
@@ -106,6 +117,8 @@ export class App {
       { change: (library) => this.rememberLibrary(library), setHand: (hand) => void this.setHand(hand) },
       this.keyboard,
     );
+    this.library.detailExtras = (item) => this.libraryExtras(item);
+    this.library.rowBadge = (item) => this.libraryBadge(item);
     this.free = new FreePracticeView(settings.freePractice, {
       change: (freePractice) => void this.patchSettings({ freePractice }),
       start: () => this.startFree(),
@@ -142,6 +155,7 @@ export class App {
       midi.init(this.settings.midiInputId),
       notationReady().then(() => this.play.render()),
       this.refreshSummary(),
+      this.reviews.load().then(() => this.library.refreshDetail()),
     ]);
   }
 
@@ -245,7 +259,7 @@ export class App {
       this.visualiser.noteOn(note, velocity);
       if (this.visualiserOn) this.keyboard.setLit(note, this.visualiser.colorFor(note));
       if (this.screen === 'play') this.play.setHeld(this.held);
-      if (this.screen === 'drill') this.drill.noteOn(note, time);
+      if (this.screen === 'drill') this.drill.noteOn(note, time, this.held);
       if (this.screen === 'free' && this.free.picking) this.free.toggleKey(note);
       if (this.screen === 'library') this.library.notePressed(note, this.held);
     };
@@ -254,17 +268,18 @@ export class App {
       this.keyboard.reveal(note);
       noteOn(note, velocity, time);
     };
-    const noteOff = (note: number) => {
+    const noteOff = (note: number, time = performance.now()) => {
       audio.noteOff(note);
       this.keyboard.setPressed(note, false);
       this.held.delete(note);
       this.visualiser.noteOff(note);
       this.keyboard.setLit(note, null);
       if (this.screen === 'play') this.play.setHeld(this.held);
+      if (this.screen === 'drill') this.drill.noteOff(note, time, this.held);
     };
 
     midi.on('noteOn', (e) => midiNoteOn(e.note, e.velocity, e.time));
-    midi.on('noteOff', (e) => noteOff(e.note));
+    midi.on('noteOff', (e) => noteOff(e.note, e.time));
     midi.on('cc', (e) => {
       audio.handleCC(e.controller, e.value);
       if (e.controller === SUSTAIN_CC) this.visualiser.setSustain(e.value >= 64);
@@ -300,9 +315,12 @@ export class App {
   private show(screen: Screen): void {
     if (this.screen === 'drill' && screen !== 'drill') this.drill.stop();
     if (this.screen === 'settings' && screen !== 'settings') this.settingsView.stopLearning(null);
-    this.screen = screen;
     if (this.screen === 'library' && screen !== 'library') this.library.deactivate();
-    if (screen !== 'settings') this.lastArea = screen === 'play' ? 'play' : screen === 'library' ? 'library' : 'study';
+    this.screen = screen;
+    if (screen !== 'settings') {
+      const fromLibrary = screen === 'library' || (screen === 'drill' && this.drillReturn === 'library');
+      this.lastArea = screen === 'play' ? 'play' : fromLibrary ? 'library' : 'study';
+    }
     if (screen === 'today' || screen === 'free') this.lastStudy = screen;
     this.root.querySelector('.app')?.setAttribute('data-screen', screen);
     this.header.setArea(screen === 'settings' ? null : this.lastArea);
@@ -339,18 +357,23 @@ export class App {
         { keys: ['r'], label: 'R', hint: 'Restart card', action: 'restart', run: () => this.drill.restart() },
         { keys: ['ArrowRight'], label: '→', hint: 'Skip', action: 'next', run: () => this.drill.skip() },
         { keys: ['ArrowLeft'], label: '←', hint: 'Previous', action: 'previous', hidden: true, run: () => this.drill.previous() },
-        { keys: ['h'], label: 'H', hint: 'Hear note', action: 'hear', run: () => this.drill.hint() },
-        this.drillKind === 'free'
-          ? { keys: ['Escape'], label: 'Esc', hint: 'Free practice', action: 'back', run: () => this.show('free') }
-          : { keys: ['Escape'], label: 'Esc', hint: 'Today', action: 'back', run: () => this.show('today') },
+        { keys: ['h'], label: 'H', hint: 'Hear answer', action: 'hear', run: () => this.drill.hint() },
+        {
+          keys: ['Escape'],
+          label: 'Esc',
+          hint: { today: 'Today', free: 'Free practice', library: 'Library' }[this.drillReturn],
+          action: 'back',
+          run: () => this.show(this.drillReturn),
+        },
         ...(this.drillKind === 'review' ? this.handHotkeys() : this.freeHandHotkeys()),
         ...this.commonHotkeys(),
       ]);
     } else {
       const back: Screen = this.lastArea === 'study' ? this.lastStudy : this.lastArea;
       this.stage.replaceChildren(this.settingsView.el);
+      const backLabel = { play: 'Play', today: 'Today', free: 'Free practice', library: 'Library' } as Record<string, string>;
       this.hotkeys.set([
-        { keys: ['Escape'], label: 'Esc', hint: back === 'play' ? 'Play' : 'Today', action: 'back', run: () => this.show(back) },
+        { keys: ['Escape'], label: 'Esc', hint: backLabel[back] ?? 'Back', action: 'back', run: () => this.show(back) },
         ...this.commonHotkeys(),
       ]);
       this.settingsView.focusFirst();
@@ -394,12 +417,22 @@ export class App {
     this.drill.stop();
     this.drillAhead = ahead;
     this.drillKind = 'review';
+    this.drillReturn = 'today';
     this.show('drill');
     const clef = noteDrillOptions(this.settings).clef;
     this.drill.start(
       new ReviewSource(cards, clef === 'both' ? 'grand' : clef, { ahead }, () => void this.refreshSummary()),
+      this.drillOptions(),
     );
     return true;
+  }
+
+  private drillOptions(): DrillOptions {
+    return {
+      scaleDirection: this.settings.scaleDrill.direction,
+      chordStaff: this.settings.chordDrill.showStaff,
+      fingering: this.settings.showFingerNumbers,
+    };
   }
 
   /** Free practice has its own hand; the legend and 1/2/3 follow it on its screens. */
@@ -424,18 +457,94 @@ export class App {
 
   /** Free practice: random cards from the chosen set, no limit, schedule untouched. */
   private startFree(): void {
-    const notes = this.settings.freePractice.notes;
-    const contents = freeContents(notes);
-    if (contents.length === 0) return;
+    const fp = this.settings.freePractice;
+    const hand = fp.notes.hand;
+    let items: DrillItem[];
+    if (fp.kind === 'chords') items = filterItems({ ...fp.chords, kinds: ['chord'] }).map((i) => itemContent(i, hand, 1));
+    else if (fp.kind === 'scales') items = filterItems({ ...fp.scales, kinds: ['scale'] }).map((i) => itemContent(i, hand, fp.octaves));
+    else items = freeContents(fp.notes).map(noteItem);
+    this.startFreeItems(items, staffForHand(hand), 'free');
+  }
+
+  /** Free practice with these cards; Esc returns to `from`. */
+  private startFreeItems(items: DrillItem[], noteStaff: ReturnType<typeof staffForHand>, from: 'free' | 'library'): void {
+    if (items.length === 0) return;
     (document.activeElement as HTMLElement | null)?.blur();
     this.drill.stop();
     this.drillKind = 'free';
+    this.drillReturn = from;
     this.show('drill');
-    this.drill.start(new FreeSource(contents, staffForHand(notes.hand)));
+    this.drill.start(new FreeSource(items, noteStaff), this.drillOptions());
+  }
+
+  // ── Library: review status and actions ───────────────────────────────
+
+  /** A Library item as a card for the current hand (scales at the Library's octaves). */
+  private libraryContent(item: LibraryItem): DrillItem {
+    return itemContent(item, this.settings.hand, this.library.octaves);
+  }
+
+  private libraryBadge(item: LibraryItem): string | null {
+    if (!REVIEWABLE.has(item.kind)) return null;
+    const state = this.reviews.state(this.libraryContent(item).id);
+    return state === 'due' ? 'due' : state === 'none' ? null : 'in review';
+  }
+
+  private libraryExtras(item: LibraryItem): HTMLElement[] {
+    if (!REVIEWABLE.has(item.kind)) return [];
+    const content = this.libraryContent(item);
+    const state = this.reviews.state(content.id);
+    const card = this.reviews.card(content.id);
+    const hand = HAND_LABELS[this.settings.hand].toLowerCase();
+    const status =
+      state === 'none'
+        ? `Not in review (${hand}).`
+        : state === 'new'
+          ? `In review (${hand}): new, it comes up within your daily new-card limit.`
+          : `In review (${hand}): next due ${relativeDue(card!.fsrs.due)}.`;
+    return [
+      h(
+        'div.button-row',
+        null,
+        h(
+          'button.button-outline',
+          { type: 'button', onclick: () => void this.toggleReview(item) },
+          h('span', null, state === 'none' ? 'Add to review' : 'Remove from review'),
+          h('kbd', null, 'R'),
+        ),
+        h(
+          'button.button-outline',
+          { type: 'button', onclick: () => this.practiseNow(item) },
+          icon('play'),
+          h('span', null, 'Practise now'),
+          h('kbd', null, 'Space'),
+        ),
+      ),
+      h('p.library-status.muted', null, status),
+    ];
+  }
+
+  private async toggleReview(item: LibraryItem | null): Promise<void> {
+    if (!item || !REVIEWABLE.has(item.kind)) return;
+    const content = this.libraryContent(item);
+    if (this.reviews.inReview(content.id)) await this.reviews.remove(content.id);
+    else await this.reviews.add(content);
+    this.library.refreshDetail();
+    void this.refreshSummary();
+  }
+
+  private practiseNow(item: LibraryItem | null): void {
+    if (!item || !REVIEWABLE.has(item.kind)) return;
+    this.startFreeItems([this.libraryContent(item)], staffForHand(this.settings.hand), 'library');
   }
 
   private async refreshSummary(): Promise<TodaySummary> {
-    const summary = await summariseToday(noteDrillOptions(this.settings));
+    const s = this.settings;
+    const summary = await summariseToday(noteDrillOptions(s), s.hand, {
+      notes: s.noteDrill.newPerDay,
+      chords: s.chordDrill.newPerDay,
+      scales: s.scaleDrill.newPerDay,
+    });
     this.summary = summary;
     this.today.update(summary);
     this.header.setDue(summary.reviews.length + summary.newCards.length);
@@ -497,6 +606,8 @@ export class App {
       { keys: ['ArrowUp'], label: '↑', hint: '', hidden: true, action: 'previous', run: () => this.library.move(-1) },
       { keys: ['h'], label: 'H', hint: 'Hear', action: 'hear', run: () => this.library.hear(false) },
       { keys: ['a'], label: 'A', hint: 'Arpeggio', run: () => this.library.hear(true) },
+      { keys: [' '], label: 'Space', hint: 'Practise', action: 'start-pause', run: () => this.practiseNow(this.library.current) },
+      { keys: ['r'], label: 'R', hint: 'Review', run: () => void this.toggleReview(this.library.current) },
       { keys: ['Escape'], label: 'Esc', hint: '', hidden: true, action: 'back', run: () => this.library.clearSearch() },
       ...this.handHotkeys(),
       { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', run: () => this.show('settings') },
@@ -531,7 +642,8 @@ export class App {
     this.settingsView.setSettings(next);
     await this.updateSettings(next);
     this.library.setHand(hand);
-    if (this.screen === 'drill' && !(await this.startDrill(this.drillAhead))) this.show('today');
+    this.library.refreshDetail();
+    if (this.screen === 'drill' && this.drillKind === 'review' && !(await this.startDrill(this.drillAhead))) this.show('today');
   }
 
   private async updateSettings(next: Settings): Promise<void> {

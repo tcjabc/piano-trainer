@@ -1,5 +1,6 @@
 /** Spaced-repetition scheduling: a thin wrapper around ts-fsrs plus session queueing. */
 import { createEmptyCard, fsrs, Rating, State, type Card, type Grade } from 'ts-fsrs';
+import { GRADING, gradeTimed } from './grading';
 import { uuid, type CardRecord, type ReviewRecord, type StoredFsrs } from './storage';
 
 export { Rating, State };
@@ -10,8 +11,6 @@ const engine = fsrs({ enable_fuzz: true, enable_short_term: true });
 /** Cards due within this window are served early once nothing else is due (as in Anki). */
 export const LEARN_AHEAD_MS = 20 * 60 * 1000;
 
-/** Response-time thresholds for auto-grading a correct answer. */
-export const GRADE_THRESHOLDS = { easyUnderMs: 1000, hardOverMs: 3000 };
 
 export function toFsrs(s: StoredFsrs): Card {
   return {
@@ -45,10 +44,7 @@ export function newFsrsState(now: number): StoredFsrs {
  * Hearing the note first (hint) caps the grade at Hard.
  */
 export function autoGrade(correct: boolean, responseMs: number, hinted = false): Grade {
-  if (!correct) return Rating.Again;
-  if (hinted || responseMs > GRADE_THRESHOLDS.hardOverMs) return Rating.Hard;
-  if (responseMs < GRADE_THRESHOLDS.easyUnderMs) return Rating.Easy;
-  return Rating.Good;
+  return gradeTimed(correct, responseMs, hinted, GRADING.notes);
 }
 
 /** Apply a grade to a card; returns the updated card and the review to store. */
@@ -80,9 +76,9 @@ export function isNew(card: CardRecord): boolean {
   return card.fsrs.state === State.New;
 }
 
-/** Already-seen cards due at `now`, earliest first. */
-export function getDueCards(cards: CardRecord[], now: number): CardRecord[] {
-  return cards.filter((c) => !isNew(c) && c.fsrs.due <= now).sort((a, b) => a.fsrs.due - b.fsrs.due);
+/** Already-seen cards due at `now`, earliest first (cards taken out of review are skipped). */
+export function getDueCards<C extends CardRecord>(cards: C[], now: number): C[] {
+  return cards.filter((c) => !c.suspended && !isNew(c) && c.fsrs.due <= now).sort((a, b) => a.fsrs.due - b.fsrs.due);
 }
 
 export function startOfDay(now: number): number {
@@ -91,9 +87,10 @@ export function startOfDay(now: number): number {
   return d.getTime();
 }
 
-/** How many new cards were introduced today, from today's reviews. */
-export function newIntroducedToday(reviewsToday: ReviewRecord[]): number {
-  return new Set(reviewsToday.filter((r) => r.stateBefore === State.New).map((r) => r.cardId)).size;
+/** How many new cards (of one kind, if given) were introduced today, from today's reviews. */
+export function newIntroducedToday(reviewsToday: ReviewRecord[], module?: ReviewRecord['module']): number {
+  const introduced = reviewsToday.filter((r) => r.stateBefore === State.New && (!module || r.module === module));
+  return new Set(introduced.map((r) => r.cardId)).size;
 }
 
 export interface DuePlan {
@@ -117,7 +114,7 @@ export function planToday(
   const ids = new Set(cards.map((c) => c.id));
   return {
     reviews: getDueCards(cards, now),
-    newCards: newOrder.filter((c) => isNew(c) && ids.has(c.id)).slice(0, allowed),
+    newCards: newOrder.filter((c) => isNew(c) && !c.suspended && ids.has(c.id)).slice(0, allowed),
   };
 }
 

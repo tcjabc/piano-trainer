@@ -38,6 +38,7 @@ export class TodayView {
           h('span.num', null, String(Math.max(1, summary.estimateMinutes))),
           ' min',
         ),
+        kindsLine(summary),
         h(
           'button.button-primary',
           { type: 'button', onclick: this.actions.start },
@@ -67,6 +68,16 @@ export class TodayView {
     if (this.hasDue) this.actions.start();
     else this.actions.practiseAhead();
   }
+}
+
+/** "Notes 6 · Chords 3 · Scales 1" when more than notes are due. */
+function kindsLine(summary: TodaySummary): HTMLElement {
+  const labels = { notes: 'Notes', chords: 'Chords', scales: 'Scales' } as const;
+  const parts = (Object.keys(labels) as (keyof typeof labels)[])
+    .map((k) => [labels[k], summary.counts[k].reviews + summary.counts[k].new] as const)
+    .filter(([, n]) => n > 0);
+  const onlyNotes = parts.length === 1 && parts[0]![0] === 'Notes';
+  return h('p.today-kinds.muted', { hidden: parts.length === 0 || onlyNotes }, parts.map(([label, n]) => `${label} ${n}`).join(' · '));
 }
 
 function nextDueText(nextDue: number | null): string {

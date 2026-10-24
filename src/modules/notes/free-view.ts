@@ -2,27 +2,29 @@
  * Free practice (Study): choose what to drill, then cards come at random with
  * no limit. Attempts are logged but never change the review schedule.
  *
- * The selection is organised by practice kind so it can grow into the
- * library: Notes works now; Chords and Scales are listed for later.
+ * The selection is organised by practice kind (notes, chords, scales); chords
+ * and scales are chosen with the same filters as the Library.
  */
+import { CHORD_QUALITIES, INVERSION_NAMES, type ChordQuality } from '../../core/chords';
+import type { LibraryFilter } from '../../core/filter';
 import { formatSpelling, midiToName, naturalsBetween, spellingToMidi, type Clef } from '../../core/pitch';
 import type { FreeNoteSettings, FreePracticeKind, FreePracticeSettings, HandChoice } from '../../core/settings';
+import { chipGroup, toggled } from '../../ui/chips';
 import { h, icon } from '../../ui/dom';
 import { FormBuilder, type Choice } from '../../ui/form';
 import { formatNoteName } from '../../ui/note-text';
+import { ALL_ROOTS, filterItems, QUALITY_LABELS } from '../library/catalog';
 import { freeContents } from './free';
+
+/** Kinds free practice can drill (scales join once their drill exists). */
+export const FREE_KINDS: ReadonlySet<FreePracticeKind> = new Set(['notes', 'chords']);
 
 export interface FreePracticeActions {
   change: (settings: FreePracticeSettings) => void;
   start: () => void;
 }
 
-/** Practice kinds. Only notes are available; the others arrive with the Phase 2 library. */
-const KINDS: Choice<FreePracticeKind | 'chords' | 'scales'>[] = [
-  { value: 'notes', label: 'Notes' },
-  { value: 'chords', label: 'Chords', disabled: true, title: 'Coming with the library' },
-  { value: 'scales', label: 'Scales', disabled: true, title: 'Coming with the library' },
-];
+const KIND_LABELS: Record<FreePracticeKind, string> = { notes: 'Notes', chords: 'Chords', scales: 'Scales' };
 
 const HANDS: Choice<HandChoice>[] = [
   { value: 'left', label: 'Left · bass' },
@@ -60,12 +62,15 @@ export class FreePracticeView {
 
   /** Cards in the current selection. */
   get size(): number {
-    return freeContents(this.settings.notes).length;
+    const s = this.settings;
+    if (s.kind === 'chords') return filterItems({ ...s.chords, kinds: ['chord'] }).length;
+    if (s.kind === 'scales') return filterItems({ ...s.scales, kinds: ['scale'] }).length;
+    return freeContents(s.notes).length;
   }
 
   /** Picking specific keys: played or clicked keys are added or removed. */
   get picking(): boolean {
-    return this.settings.notes.selection === 'specific';
+    return this.settings.kind === 'notes' && this.settings.notes.selection === 'specific';
   }
 
   toggleKey(midi: number): void {
@@ -81,6 +86,10 @@ export class FreePracticeView {
 
   private commit(mutate: (notes: FreeNoteSettings) => void): void {
     mutate(this.settings.notes);
+    this.save();
+  }
+
+  private save(): void {
     this.actions.change(structuredClone(this.settings));
     this.render();
   }
@@ -102,14 +111,50 @@ export class FreePracticeView {
         'Practise',
         f.field(
           'Kind',
-          f.segmented('kind', KINDS, this.settings.kind, (v) => {
-            if (v === 'notes') this.settings.kind = v;
-          }),
+          f.segmented<FreePracticeKind>(
+            'kind',
+            (Object.keys(KIND_LABELS) as FreePracticeKind[]).map((k) => ({
+              value: k,
+              label: KIND_LABELS[k],
+              disabled: !FREE_KINDS.has(k),
+              title: FREE_KINDS.has(k) ? undefined : 'Coming soon',
+            })),
+            this.settings.kind,
+            (v) => {
+              this.settings.kind = v;
+              this.save();
+            },
+          ),
         ),
+        f.field('Hand', f.segmented('hand', HANDS, n.hand, (v) => this.commit((x) => (x.hand = v)))),
       ),
+      ...this.kindSections(),
+      h(
+        'div.free-start',
+        null,
+        h('p.num.muted', null, `${count} ${count === 1 ? 'card' : 'cards'}`),
+        h(
+          'button.button-primary',
+          { type: 'button', disabled: count === 0, onclick: () => this.actions.start() },
+          h('span', null, 'Start free practice'),
+          icon('chevron-right'),
+        ),
+        h('p.today-hint.muted', null, 'Press ', h('kbd', null, 'Space'), ' to start'),
+      ),
+    );
+
+    if (focusedId) document.getElementById(focusedId)?.focus();
+  }
+
+  /** The selection for the chosen kind. */
+  private kindSections(): HTMLElement[] {
+    const f = this.form;
+    const n = this.settings.notes;
+    if (this.settings.kind === 'chords') return [this.chordSection()];
+    if (this.settings.kind === 'scales') return [];
+    return [
       f.section(
         'Notes',
-        f.field('Hand', f.segmented('hand', HANDS, n.hand, (v) => this.commit((x) => (x.hand = v)))),
         f.field(
           'Choose by',
           f.segmented<FreeNoteSettings['selection']>(
@@ -132,21 +177,24 @@ export class FreePracticeView {
           ),
         ),
       ),
-      h(
-        'div.free-start',
-        null,
-        h('p.num.muted', null, `${count} ${count === 1 ? 'card' : 'cards'}`),
-        h(
-          'button.button-primary',
-          { type: 'button', disabled: count === 0, onclick: () => this.actions.start() },
-          h('span', null, 'Start free practice'),
-          icon('chevron-right'),
-        ),
-        h('p.today-hint.muted', null, 'Press ', h('kbd', null, 'Space'), ' to start'),
+    ];
+  }
+
+  private chordSection(): HTMLElement {
+    const c = this.settings.chords;
+    const update = (patch: Partial<LibraryFilter>) => {
+      this.settings.chords = { ...c, ...patch };
+      this.save();
+    };
+    return this.form.section(
+      'Chords',
+      h('p.muted.field-note', null, 'Leave a group empty for all of it. Each chord is played in the hand above; any voicing counts, with the inversion’s bass lowest.'),
+      chipGroup<ChordQuality>('Quality', CHORD_QUALITIES.map((q) => q.id), c.qualities, (q) => QUALITY_LABELS[q], (q) => update({ qualities: toggled(c.qualities, q) })),
+      chipGroup<string>('Root', ALL_ROOTS, c.roots, (r) => formatNoteName(r), (r) => update({ roots: toggled(c.roots, r) })),
+      chipGroup<number>('Inversion', [0, 1, 2, 3, 4], c.inversions, (i) => (i === 0 ? 'Root' : INVERSION_NAMES[i]!.split(' ')[0]!), (i) =>
+        update({ inversions: toggled(c.inversions, i) }),
       ),
     );
-
-    if (focusedId) document.getElementById(focusedId)?.focus();
   }
 
   private rangeFields(n: FreeNoteSettings): HTMLElement[] {

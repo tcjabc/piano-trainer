@@ -41,6 +41,12 @@ export interface ScaleItem {
 
 export type LibraryItem = ChordItem | ScaleItem;
 
+/** Short labels for chord qualities in filter chips. */
+export const QUALITY_LABELS: Record<ChordQuality, string> = {
+  M: 'major', m: 'minor', dim: 'dim', aug: 'aug', sus2: 'sus2', sus4: 'sus4', '6': '6', m6: 'm6',
+  '7': '7', maj7: 'maj7', m7: 'm7', m7b5: 'half-dim', dim7: 'dim7', add9: 'add9', '9': '9',
+};
+
 export function chordItemId(spec: ChordSpec): string {
   return `chord:${spec.root}:${spec.quality}:${spec.inversion}`;
 }

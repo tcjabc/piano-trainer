@@ -4,7 +4,8 @@ import { DEFAULT_SETTINGS, type FreeNoteSettings } from '../../core/settings';
 import { Storage } from '../../core/storage';
 import { newCard } from './cards';
 import { freeContents, freeRange, staffForHand } from './free';
-import { FreeSource } from './sources';
+import { FreeSource } from '../drill/sources';
+import { noteItem } from '../drill/items';
 
 const base = DEFAULT_SETTINGS.freePractice.notes;
 const opts = (o: Partial<FreeNoteSettings>): FreeNoteSettings => ({ ...base, ...o });
@@ -35,14 +36,14 @@ describe('FreeSource', () => {
   it('serves cards at random without an end and never twice in a row', () => {
     let i = 0;
     const rolls = [0, 0, 0.99, 0.5, 0];
-    const source = new FreeSource(freeContents(base), 'treble', async () => {}, () => rolls[i++ % rolls.length]!);
+    const source = new FreeSource(freeContents(base).map(noteItem), 'treble', async () => {}, () => rolls[i++ % rolls.length]!);
     const ids = Array.from({ length: 40 }, () => source.next()!.id);
     expect(ids.every((id, k) => k === 0 || id !== ids[k - 1])).toBe(true);
     expect(new Set(ids).size).toBeGreaterThan(1);
   });
 
   it('serves a stepped-back card next', () => {
-    const source = new FreeSource(freeContents(base), 'treble', async () => {});
+    const source = new FreeSource(freeContents(base).map(noteItem), 'treble', async () => {});
     const first = source.next()!;
     source.next();
     source.pushFront(first);
@@ -53,10 +54,10 @@ describe('FreeSource', () => {
     const db = new Storage('free-test');
     const card = newCard({ clef: 'treble', spelling: 'C4', midi: 60 }, 1);
     await db.putCard(card);
-    const source = new FreeSource(freeContents(base), 'treble', (a) => db.addAttempt(a));
+    const source = new FreeSource(freeContents(base).map(noteItem), 'treble', (a) => db.addAttempt(a));
     const item = source.next()!;
-    await source.record(item, true, 850, false);
-    await source.record(item, false, 2000, true);
+    await source.record(item, { correct: true, ms: 850 }, false);
+    await source.record(item, { correct: false, ms: 2000 }, true);
 
     const attempts = await db.getAttemptsSince(0);
     expect(attempts).toHaveLength(2);

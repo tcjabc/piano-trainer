@@ -10,7 +10,7 @@ import {
   type Spelling,
 } from '../../core/pitch';
 import type { NoteDrillOptions } from '../../core/settings';
-import { uuid, type CardRecord, type NoteCardContent } from '../../core/storage';
+import { uuid, type NoteCard, type NoteCardContent } from '../../core/storage';
 
 export function cardKey(clef: Clef, spelling: string): string {
   return `notes:${clef}:${spelling}`;
@@ -50,7 +50,7 @@ export function contentsFor(options: NoteDrillOptions): NoteCardContent[] {
   );
 }
 
-export function newCard(content: NoteCardContent, now: number): CardRecord {
+export function newCard(content: NoteCardContent, now: number): NoteCard {
   return {
     id: uuid(),
     key: cardKey(content.clef, content.spelling),

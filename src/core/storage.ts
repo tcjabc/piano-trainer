@@ -3,8 +3,10 @@
  * and an `updatedAt` timestamp (epoch ms) so a sync layer can be added later.
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import type { ChordQuality } from './chords';
 import type { Clef } from './pitch';
-import { withDefaults, type Settings } from './settings';
+import type { ScaleType } from './scales';
+import { withDefaults, type HandChoice, type Settings } from './settings';
 
 /** FSRS card state as stored: dates are epoch ms so records survive JSON round trips. */
 export interface StoredFsrs {
@@ -28,16 +30,39 @@ export interface NoteCardContent {
   midi: number;
 }
 
-export interface CardRecord {
+/** A chord to play anywhere on the keyboard; identity is root + quality + inversion + hand. */
+export interface ChordCardContent {
+  root: string;
+  quality: ChordQuality;
+  inversion: number;
+  hand: HandChoice;
+}
+
+/** A scale to play; identity is tonic + type + hand + octaves. */
+export interface ScaleCardContent {
+  tonic: string;
+  type: ScaleType;
+  hand: HandChoice;
+  octaves: 1 | 2;
+}
+
+interface CardBase {
   id: string;
-  /** Unique, human-readable identity, e.g. "notes:treble:C#4". */
+  /** Unique, human-readable identity, e.g. "notes:treble:C#4", "chords:F#:m7:1:right". */
   key: string;
-  module: 'notes';
-  content: NoteCardContent;
   fsrs: StoredFsrs;
   createdAt: number;
   updatedAt: number;
+  /** Taken out of review (kept so its history and schedule return if it is added again). */
+  suspended?: boolean;
 }
+
+export type NoteCard = CardBase & { module: 'notes'; content: NoteCardContent };
+export type ChordCard = CardBase & { module: 'chords'; content: ChordCardContent };
+export type ScaleCard = CardBase & { module: 'scales'; content: ScaleCardContent };
+export type CardRecord = NoteCard | ChordCard | ScaleCard;
+export type CardModule = CardRecord['module'];
+export type CardContent = CardRecord['content'];
 
 export interface ReviewRecord {
   id: string;
@@ -71,9 +96,11 @@ export interface AttemptRecord {
   mode: 'free';
   /** Same form as a card key, e.g. "notes:treble:C#4" (the card may not exist). */
   key: string;
-  content: NoteCardContent;
+  content: CardContent;
   correct: boolean;
   responseMs: number;
+  /** Wrong notes along the way (scales). */
+  errors?: number;
   /** The note was heard (H) before answering. */
   hinted: boolean;
   at: number;
@@ -174,8 +201,12 @@ export class Storage {
 
   // ── Cards ──────────────────────────────────────────────────────────────
 
-  async getCards(module: CardRecord['module']): Promise<CardRecord[]> {
-    return (await this.db()).getAllFromIndex('cards', 'module', module);
+  async getCards<M extends CardModule>(module: M): Promise<Extract<CardRecord, { module: M }>[]> {
+    return (await this.db()).getAllFromIndex('cards', 'module', module) as Promise<Extract<CardRecord, { module: M }>[]>;
+  }
+
+  async getCardByKey(key: string): Promise<CardRecord | undefined> {
+    return (await this.db()).getFromIndex('cards', 'key', key);
   }
 
   async getCard(id: string): Promise<CardRecord | undefined> {

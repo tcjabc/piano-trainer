@@ -198,8 +198,13 @@ export class Keyboard extends Emitter<KeyboardEvents> {
 
   /** Mark the key that should have been played (null clears it). */
   setTarget(note: number | null): void {
+    this.setTargets(note === null ? [] : [note]);
+  }
+
+  /** Mark several keys that should be played (a chord's missing notes). */
+  setTargets(notes: Iterable<number>): void {
     for (const key of this.track.querySelectorAll('.is-target')) key.classList.remove('is-target');
-    if (note !== null) this.keys.get(note)?.classList.add('is-target');
+    for (const note of notes) this.keys.get(note)?.classList.add('is-target');
   }
 
   /** Show a finger number and colour on a key (null removes it). */

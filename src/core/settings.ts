@@ -54,12 +54,30 @@ export interface FreeNoteSettings {
   specific: number[];
 }
 
-/** What free practice drills. Only notes for now; chords and scales come with the library. */
-export type FreePracticeKind = 'notes';
+/** What free practice drills. */
+export type FreePracticeKind = 'notes' | 'chords' | 'scales';
 
 export interface FreePracticeSettings {
   kind: FreePracticeKind;
+  /** Notes, and the hand used for every kind. */
   notes: FreeNoteSettings;
+  /** Which chords (a Library filter). */
+  chords: LibraryFilter;
+  /** Which scales (a Library filter), and over how many octaves. */
+  scales: LibraryFilter;
+  octaves: 1 | 2;
+}
+
+/** Chord cards: daily new cards, and whether the staff is shown under the name. */
+export interface ChordDrillSettings {
+  newPerDay: number;
+  showStaff: boolean;
+}
+
+/** Scale cards: daily new cards, and ascending only or up and down. */
+export interface ScaleDrillSettings {
+  newPerDay: number;
+  direction: 'up' | 'updown';
 }
 
 /** The Library's remembered state. */
@@ -89,6 +107,8 @@ export interface Settings {
   /** The last free-practice selection, remembered. */
   freePractice: FreePracticeSettings;
   library: LibrarySettings;
+  chordDrill: ChordDrillSettings;
+  scaleDrill: ScaleDrillSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -118,8 +138,13 @@ export const DEFAULT_SETTINGS: Settings = {
       accidentals: false,
       specific: [],
     },
+    chords: { ...EMPTY_FILTER, kinds: ['chord'], qualities: ['M', 'm'], roots: ['C', 'G', 'F'], inversions: [0] },
+    scales: { ...EMPTY_FILTER, kinds: ['scale'], scaleTypes: ['major'], roots: ['C', 'G', 'F'] },
+    octaves: 1,
   },
   library: { filter: EMPTY_FILTER, selected: null, octaves: 1 },
+  chordDrill: { newPerDay: 5, showStaff: false },
+  scaleDrill: { newPerDay: 3, direction: 'up' },
 };
 
 const CLEF_FOR_HAND: Record<HandChoice, ClefChoice> = { left: 'bass', right: 'treble', both: 'both' };
@@ -160,9 +185,13 @@ export function withDefaults(partial: LegacySettings | undefined): Settings {
       ...partial?.library,
       filter: { ...EMPTY_FILTER, ...partial?.library?.filter },
     },
+    chordDrill: { ...DEFAULT_SETTINGS.chordDrill, ...partial?.chordDrill },
+    scaleDrill: { ...DEFAULT_SETTINGS.scaleDrill, ...partial?.scaleDrill },
     freePractice: {
       ...DEFAULT_SETTINGS.freePractice,
       ...partial?.freePractice,
+      chords: { ...DEFAULT_SETTINGS.freePractice.chords, ...partial?.freePractice?.chords },
+      scales: { ...DEFAULT_SETTINGS.freePractice.scales, ...partial?.freePractice?.scales },
       notes: {
         ...DEFAULT_SETTINGS.freePractice.notes,
         ...partial?.freePractice?.notes,

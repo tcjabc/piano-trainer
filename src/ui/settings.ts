@@ -176,7 +176,7 @@ export class SettingsView {
         ),
       ),
       form.section(
-        'Note drill',
+        'Study',
         form.field(
           'Hand',
           form.segmented<HandChoice>(
@@ -201,8 +201,25 @@ export class SettingsView {
           form.checkbox(d.accidentals, (v) => this.commit((x) => (x.noteDrill.accidentals = v)), 'Include sharps and flats'),
         ),
         form.field(
-          'New cards per day',
+          'New notes per day',
           form.numberInput(d.newPerDay, 0, 100, (v) => this.commit((x) => (x.noteDrill.newPerDay = v))),
+        ),
+        form.field(
+          'New chords per day',
+          form.numberInput(s.chordDrill.newPerDay, 0, 50, (v) => this.commit((x) => (x.chordDrill.newPerDay = v))),
+        ),
+        form.field(
+          'Chord cards',
+          form.checkbox(
+            s.chordDrill.showStaff,
+            (v) => this.commit((x) => (x.chordDrill.showStaff = v)),
+            'Show the chord on the staff as well as its name',
+          ),
+        ),
+        h(
+          'p.muted.field-note',
+          null,
+          'Each kind has its own daily limit for new cards, so adding a large deck never crowds out the rest. Due reviews are never limited.',
         ),
       ),
       form.section(

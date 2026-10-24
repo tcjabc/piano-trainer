@@ -1296,3 +1296,41 @@ select.control {
 .key-black.is-highlight {
   box-shadow: inset 0 calc(var(--border-divider) * -3) 0 var(--color-key-name-on-black);
 }
+
+/* ── Drill prompts (chords, scales) ─────────────────────────────────────── */
+
+.staff-prompt-block {
+  display: none;
+  justify-items: center;
+  gap: var(--spacing-5);
+  text-align: center;
+}
+
+.staff-panel.has-prompt .staff-prompt-block {
+  display: grid;
+}
+
+.staff-prompt {
+  font-size: var(--text-display);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-heading);
+  line-height: 1;
+}
+
+.staff-prompt-sub {
+  font-size: var(--text-body-sm);
+}
+
+.staff-panel.has-prompt {
+  align-content: center;
+}
+
+.library-status {
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+.today-kinds {
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+}

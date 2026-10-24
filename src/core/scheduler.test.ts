@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { newCard } from '../modules/notes/cards';
 import { autoGrade, interleave, LEARN_AHEAD_MS, Rating, recordReview, SessionQueue, State } from './scheduler';
-import type { CardRecord } from './storage';
+import type { CardRecord, NoteCard } from './storage';
 
 const NOW = new Date('2026-10-24T10:00:00Z').getTime();
 const card = (spelling: string) => newCard({ clef: 'treble', spelling, midi: 60 }, NOW);
+const sp = (c: CardRecord | null) => (c as NoteCard | null)?.content.spelling;
 
 describe('autoGrade', () => {
   it('grades by correctness and response time', () => {
@@ -39,10 +40,10 @@ describe('interleave', () => {
   it('spreads new cards through reviews', () => {
     const reviews = ['r1', 'r2', 'r3', 'r4'].map(card);
     const fresh = ['n1', 'n2'].map(card);
-    const order = interleave(reviews, fresh).map((c) => c.content.spelling);
+    const order = interleave(reviews, fresh).map(sp);
     expect(order).toHaveLength(6);
     expect(order[0]).toBe('r1');
-    expect(order.filter((s) => s.startsWith('n'))).toEqual(['n1', 'n2']);
+    expect(order.filter((s) => s?.startsWith('n'))).toEqual(['n1', 'n2']);
     expect(order.indexOf('n1')).toBeLessThan(order.indexOf('r4'));
   });
 });
@@ -55,8 +56,8 @@ describe('SessionQueue', () => {
 
   it('serves due cards and finishes when nothing is left', () => {
     const q = new SessionQueue([card('C4'), card('D4')]);
-    expect(q.next(NOW)?.content.spelling).toBe('C4');
-    expect(q.next(NOW)?.content.spelling).toBe('D4');
+    expect(sp(q.next(NOW))).toBe('C4');
+    expect(sp(q.next(NOW))).toBe('D4');
     expect(q.next(NOW)).toBeNull();
   });
 
@@ -66,7 +67,7 @@ describe('SessionQueue', () => {
     const first = q.next(NOW)!;
     const failed = recordReview(first, Rating.Again, 900, NOW).card;
     q.requeue(failed, NOW);
-    expect(q.next(NOW)?.content.spelling).toBe('D4');
+    expect(sp(q.next(NOW))).toBe('D4');
     // Only the failed card remains; it is served inside the learn-ahead window.
     expect(q.next(NOW)?.id).toBe(a.id);
   });

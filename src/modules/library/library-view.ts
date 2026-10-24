@@ -11,9 +11,10 @@ import { SCALE_TYPES, scaleInfo, scaleNotes, type ScaleType } from '../../core/s
 import type { HandChoice, LibrarySettings } from '../../core/settings';
 import { h, icon } from '../../ui/dom';
 import type { Keyboard } from '../../ui/keyboard';
+import { chipGroup, toggled } from '../../ui/chips';
 import { formatDegrees, formatNoteName } from '../../ui/note-text';
 import { checkChord, ScaleTracker } from '../drill/check';
-import { ALL_ROOTS, EMPTY_FILTER, filterItems, itemById, type ItemKind, type LibraryFilter, type LibraryItem } from './catalog';
+import { ALL_ROOTS, EMPTY_FILTER, filterItems, itemById, QUALITY_LABELS, type ItemKind, type LibraryFilter, type LibraryItem } from './catalog';
 import { chordTarget, fingers, itemKeys, notation, scaleReference, voicings } from './voicing';
 
 export interface LibraryActions {
@@ -21,11 +22,6 @@ export interface LibraryActions {
   change: (settings: LibrarySettings) => void;
   setHand: (hand: HandChoice) => void;
 }
-
-const QUALITY_LABELS: Record<ChordQuality, string> = {
-  M: 'major', m: 'minor', dim: 'dim', aug: 'aug', sus2: 'sus2', sus4: 'sus4', '6': '6', m6: 'm6',
-  '7': '7', maj7: 'maj7', m7: 'm7', m7b5: 'half-dim', dim7: 'dim7', add9: 'add9', '9': '9',
-};
 
 const TICK_MS = 1600;
 
@@ -347,30 +343,10 @@ export class LibraryView {
 
   private renderFilters(): void {
     const f = this.settings.filter;
-    const toggle = <T>(list: T[], value: T): T[] => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
     const update = (patch: Partial<LibraryFilter>) => {
       this.settings.filter = { ...this.settings.filter, ...patch };
       this.commit();
     };
-    const chips = <T extends string | number>(
-      title: string,
-      values: readonly T[],
-      selected: T[],
-      label: (v: T) => string | Node,
-      onToggle: (v: T) => void,
-    ) =>
-      h(
-        'div.filter-group',
-        null,
-        h('h2.subheading', null, title),
-        h(
-          'div.chips',
-          null,
-          ...values.map((v) =>
-            h('button.chip', { type: 'button', 'aria-pressed': String(selected.includes(v)), onclick: () => onToggle(v) }, label(v)),
-          ),
-        ),
-      );
     const showChords = f.kinds.length === 0 || f.kinds.includes('chord');
     const showScales = f.kinds.length === 0 || f.kinds.includes('scale');
     const hands: [HandChoice, string][] = [
@@ -381,21 +357,21 @@ export class LibraryView {
 
     this.filtersEl.replaceChildren(
       ...present(
-      chips<ItemKind>('Type', ['chord', 'scale'], f.kinds, (k) => (k === 'chord' ? 'Chords' : 'Scales'), (k) => update({ kinds: toggle(f.kinds, k) })),
+      chipGroup<ItemKind>('Type', ['chord', 'scale'], f.kinds, (k) => (k === 'chord' ? 'Chords' : 'Scales'), (k) => update({ kinds: toggled(f.kinds, k) })),
       showChords
-        ? chips<ChordQuality>('Chord quality', CHORD_QUALITIES.map((q) => q.id), f.qualities, (q) => QUALITY_LABELS[q], (q) =>
-            update({ qualities: toggle(f.qualities, q) }),
+        ? chipGroup<ChordQuality>('Chord quality', CHORD_QUALITIES.map((q) => q.id), f.qualities, (q) => QUALITY_LABELS[q], (q) =>
+            update({ qualities: toggled(f.qualities, q) }),
           )
         : null,
       showChords
-        ? chips<number>('Inversion', [0, 1, 2, 3, 4], f.inversions, (i) => (i === 0 ? 'Root' : INVERSION_NAMES[i]!.split(' ')[0]!), (i) =>
-            update({ inversions: toggle(f.inversions, i) }),
+        ? chipGroup<number>('Inversion', [0, 1, 2, 3, 4], f.inversions, (i) => (i === 0 ? 'Root' : INVERSION_NAMES[i]!.split(' ')[0]!), (i) =>
+            update({ inversions: toggled(f.inversions, i) }),
           )
         : null,
       showScales
-        ? chips<ScaleType>('Scale type', SCALE_TYPES.map((s) => s.id), f.scaleTypes, (s) => s, (s) => update({ scaleTypes: toggle(f.scaleTypes, s) }))
+        ? chipGroup<ScaleType>('Scale type', SCALE_TYPES.map((s) => s.id), f.scaleTypes, (s) => s, (s) => update({ scaleTypes: toggled(f.scaleTypes, s) }))
         : null,
-      chips<string>('Root', ALL_ROOTS, f.roots, (r) => formatNoteName(r), (r) => update({ roots: toggle(f.roots, r) })),
+      chipGroup<string>('Root', ALL_ROOTS, f.roots, (r) => formatNoteName(r), (r) => update({ roots: toggled(f.roots, r) })),
       h(
         'div.filter-group',
         null,
@@ -409,7 +385,7 @@ export class LibraryView {
         ),
       ),
       showScales
-        ? chips<number>('Scale octaves', [1, 2], [this.settings.octaves], (o) => `${o} octave${o === 2 ? 's' : ''}`, (o) => {
+        ? chipGroup<number>('Scale octaves', [1, 2], [this.settings.octaves], (o) => `${o} octave${o === 2 ? 's' : ''}`, (o) => {
             this.settings.octaves = o as 1 | 2;
             this.commit();
           })
