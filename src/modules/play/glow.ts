@@ -92,17 +92,25 @@ export function presetColor(t: Tokens, mode: VisualiserColors, note: number): st
 /** Glow layer, then the near-white core, each as cap + stretched body + cap. */
 export function drawPill(ctx: CanvasRenderingContext2D, t: Tokens, s: Sprites, x: number, top: number, bottom: number, barW: number): void {
   drawGlow(ctx, t, s, x, top, bottom, barW);
-  const r = barW / 2;
-  const capTop = top + r;
-  const capBottom = bottom - r;
+  drawCore(ctx, s, x, top, bottom, barW, t.coreWidth);
+}
+
+/**
+ * The core alone, `width` of the bar wide. The song view draws every glow
+ * first, then the cores over them unblended, so a finger-coloured core keeps
+ * its hue inside a glow in the hand's colour.
+ */
+export function drawCore(ctx: CanvasRenderingContext2D, s: Sprites, x: number, top: number, bottom: number, barW: number, width: number): void {
+  const capTop = top + barW / 2;
+  const capBottom = bottom - barW / 2;
   const body = Math.max(0, capBottom - capTop);
-  const cw = barW * t.coreWidth;
+  const cw = barW * width;
   ctx.drawImage(s.coreCapTop, x - cw / 2, capTop - cw / 2, cw, cw / 2);
   if (body > 0) ctx.drawImage(s.coreBody, x - cw / 2, capTop, cw, body);
   ctx.drawImage(s.coreCapBottom, x - cw / 2, capBottom, cw, cw / 2);
 }
 
-function drawGlow(ctx: CanvasRenderingContext2D, t: Tokens, s: Sprites, x: number, top: number, bottom: number, barW: number): void {
+export function drawGlow(ctx: CanvasRenderingContext2D, t: Tokens, s: Sprites, x: number, top: number, bottom: number, barW: number): void {
   const capTop = top + barW / 2;
   const capBottom = bottom - barW / 2;
   const body = Math.max(0, capBottom - capTop);
@@ -111,44 +119,6 @@ function drawGlow(ctx: CanvasRenderingContext2D, t: Tokens, s: Sprites, x: numbe
   if (body > 0) ctx.drawImage(s.glowBody, x - gw / 2, capTop, gw, body);
   ctx.drawImage(s.glowCapBottom, x - gw / 2, capBottom, gw, gw / 2);
 }
-
-/**
- * A hollow pill: the same glow and width, but a dark centre with a faint
- * tint inside a bright outline (the song view draws the left hand this way).
- */
-export function drawHollowPill(
-  ctx: CanvasRenderingContext2D,
-  t: Tokens,
-  s: Sprites,
-  x: number,
-  top: number,
-  bottom: number,
-  barW: number,
-  centre: string,
-): void {
-  drawGlow(ctx, t, s, x, top, bottom, barW);
-  const op = ctx.globalCompositeOperation;
-  ctx.globalCompositeOperation = 'source-over';
-  // Keep the outline inside narrow pills (a zoomed-out keyboard makes them a few pixels wide).
-  const line = Math.min(barW * 0.4, Math.max(1.5, barW * HOLLOW_LINE));
-  const w = Math.max(0, barW - line);
-  const h = Math.max(0, bottom - top - line);
-  const path = new Path2D();
-  path.roundRect(x - barW / 2 + line / 2, top + line / 2, w, h, Math.min(w, h) / 2);
-  ctx.fillStyle = centre;
-  ctx.fill(path);
-  ctx.fillStyle = rgba(s.color, HOLLOW_TINT);
-  ctx.fill(path);
-  ctx.lineWidth = line;
-  ctx.strokeStyle = mix(s.color, '#ffffff', HOLLOW_LIGHTEN);
-  ctx.stroke(path);
-  ctx.globalCompositeOperation = op;
-}
-
-/** Hollow pills: outline width (fraction of the bar), tint of the centre, and how much lighter the outline is. */
-const HOLLOW_LINE = 0.16;
-const HOLLOW_TINT = 0.18;
-const HOLLOW_LIGHTEN = 0.25;
 
 /** Glow, core, ember and flash sprites for one colour. */
 export function renderSprites(color: string, t: Tokens): Sprites {

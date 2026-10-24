@@ -65,6 +65,12 @@ export class StaffView {
 
   setState(state: StaffState, caption = ''): void {
     this.el.dataset.state = state;
+    // A wrong answer shakes the panel (restarted each time; CSS turns it off for reduced motion).
+    this.el.classList.remove('is-shaking');
+    if (state === 'wrong') {
+      void this.el.offsetWidth;
+      this.el.classList.add('is-shaking');
+    }
     setNoteText(this.caption, caption);
   }
 

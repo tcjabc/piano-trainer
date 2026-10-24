@@ -346,12 +346,17 @@
   transition: color var(--duration-feedback) var(--easing);
 }
 
-.staff-panel[data-state='correct'] .vf-stavenote {
-  color: var(--color-correct);
+/* Right and wrong are told by shape: a tick or a cross before the caption, and a shake. */
+.staff-panel[data-state='correct'] .staff-caption::before {
+  content: '✓ ';
 }
 
-.staff-panel[data-state='wrong'] .vf-stavenote {
-  color: var(--color-wrong);
+.staff-panel[data-state='wrong'] .staff-caption::before {
+  content: '✕ ';
+}
+
+.staff-panel.is-shaking {
+  animation: feedback-shake var(--feedback-shake-duration) var(--easing);
 }
 
 .staff-panel[data-state='correct'] {
@@ -373,8 +378,24 @@
   color: var(--color-text-muted);
 }
 
+.staff-panel[data-state='correct'] .staff-caption,
 .staff-panel[data-state='wrong'] .staff-caption {
-  color: var(--color-wrong);
+  color: var(--color-text);
+}
+
+@keyframes feedback-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(calc(var(--feedback-shake-distance) * -1)); }
+  40% { transform: translateX(var(--feedback-shake-distance)); }
+  60% { transform: translateX(calc(var(--feedback-shake-distance) * -0.6)); }
+  80% { transform: translateX(calc(var(--feedback-shake-distance) * 0.6)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .staff-panel.is-shaking,
+  .key.flash-wrong {
+    animation: none;
+  }
 }
 
 .staff-corner {
@@ -620,12 +641,36 @@ select.control {
   background: var(--color-key-black-pressed);
 }
 
+/* Feedback on a key: a neutral flash with a tick, or a cross and a short shake. */
 .key.flash-correct {
-  background: var(--color-correct);
+  background: var(--color-correct-soft);
 }
 
 .key.flash-wrong {
-  background: var(--color-wrong);
+  background: var(--color-wrong-soft);
+  animation: feedback-shake var(--feedback-shake-duration) var(--easing);
+}
+
+.key.flash-correct::before,
+.key.flash-wrong::before {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--spacing-8);
+  text-align: center;
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  color: var(--color-correct);
+  pointer-events: none;
+}
+
+.key.flash-correct::before {
+  content: '✓';
+}
+
+.key.flash-wrong::before {
+  content: '✕';
 }
 
 /* The key that should have been played after a wrong answer. */
@@ -635,7 +680,7 @@ select.control {
 }
 
 .key-black.is-target {
-  background: var(--color-correct);
+  background: var(--color-correct-soft);
 }
 
 .key-label {
@@ -669,7 +714,7 @@ select.control {
   border-radius: var(--radius-default);
   background: var(--finger-color);
   box-shadow: 0 0 0 var(--border-hairline) var(--color-canvas);
-  color: var(--color-on-functional);
+  color: var(--color-on-finger);
   font-family: var(--font-mono);
   font-size: var(--text-caption);
   font-weight: var(--font-weight-bold);
@@ -715,6 +760,15 @@ select.control {
   opacity: 1;
 }
 
+/* Each hand's outline in its colour: left cyan, right magenta. */
+.hand.hand-left {
+  color: var(--color-hand-left);
+}
+
+.hand.hand-right {
+  color: var(--color-hand-right);
+}
+
 .hand-svg {
   display: block;
   width: var(--hand-size);
@@ -735,7 +789,7 @@ select.control {
 
 .finger-number {
   display: none;
-  fill: var(--color-on-functional);
+  fill: var(--color-on-finger);
   font-family: var(--font-mono);
   font-size: var(--hand-number-size);
   font-weight: var(--font-weight-bold);
@@ -762,6 +816,13 @@ select.control {
 .notation [data-finger='3'] text { fill: var(--finger-3); }
 .notation [data-finger='4'] text { fill: var(--finger-4); }
 .notation [data-finger='5'] text { fill: var(--finger-5); }
+
+/* A thin outline so the brighter finger colours (yellow) read on a light page. */
+.notation [data-finger] text {
+  stroke: var(--finger-text-outline);
+  stroke-width: 0.6px;
+  paint-order: stroke;
+}
 
 /* ── Play ───────────────────────────────────────────────────────────────── */
 
@@ -1852,8 +1913,8 @@ select.control {
 .section-pip[data-step='3'] { --pip-fill: 75%; }
 
 .section-pip[data-step='4'] {
-  border-color: var(--color-correct);
-  background: var(--color-correct);
+  border-color: var(--color-text);
+  background: var(--color-text);
 }
 
 .song-import {
@@ -2036,7 +2097,11 @@ select.control {
 }
 
 .song-result.is-clean {
-  color: var(--color-correct);
+  font-weight: var(--font-weight-bold);
+}
+
+.song-result.is-clean::before {
+  content: '✓ ';
 }
 
 .song-review {
@@ -2157,19 +2222,18 @@ select.control {
   cursor: pointer;
 }
 
-.finger-choice[data-finger='1'] { color: var(--finger-1); border-color: var(--finger-1); }
-.finger-choice[data-finger='2'] { color: var(--finger-2); border-color: var(--finger-2); }
-.finger-choice[data-finger='3'] { color: var(--finger-3); border-color: var(--finger-3); }
-.finger-choice[data-finger='4'] { color: var(--finger-4); border-color: var(--finger-4); }
-.finger-choice[data-finger='5'] { color: var(--finger-5); border-color: var(--finger-5); }
+.finger-choice[data-finger='1'] { background: var(--finger-1); border-color: var(--finger-1); color: var(--color-on-finger); }
+.finger-choice[data-finger='2'] { background: var(--finger-2); border-color: var(--finger-2); color: var(--color-on-finger); }
+.finger-choice[data-finger='3'] { background: var(--finger-3); border-color: var(--finger-3); color: var(--color-on-finger); }
+.finger-choice[data-finger='4'] { background: var(--finger-4); border-color: var(--finger-4); color: var(--color-on-finger); }
+.finger-choice[data-finger='5'] { background: var(--finger-5); border-color: var(--finger-5); color: var(--color-on-finger); }
 
 .song-fingering-note:empty {
   display: none;
 }
 
-/* A suggested finger (automatic fingering): fainter, with a dotted outline. */
+/* A suggested finger (automatic fingering): same colours, an italic number and a dotted outline. */
 .finger-badge.is-suggested {
-  opacity: var(--suggested-opacity);
   outline: var(--border-hairline) dotted var(--finger-color);
   outline-offset: 1px;
   font-style: italic;
@@ -2190,10 +2254,7 @@ select.control {
   font-size: var(--text-caption);
 }
 
-/*
- * The next keys in a song: a marker above the finger badge, filled for the
- * right hand and outlined for the left, matching the falling notes.
- */
+/* The next keys in a song: a marker above the finger badge, in the hand's colour. */
 .key.is-upcoming-l::after,
 .key.is-upcoming-r::after {
   content: '';
@@ -2204,7 +2265,6 @@ select.control {
   height: var(--upcoming-marker-height);
   transform: translateX(-50%);
   border-radius: var(--upcoming-marker-height);
-  box-sizing: border-box;
 }
 
 .key-black.is-upcoming-l::after,
@@ -2212,24 +2272,16 @@ select.control {
   bottom: calc(var(--spacing-8) + var(--finger-badge-size) + var(--spacing-5));
 }
 
+.key.is-upcoming-l::after {
+  background: var(--color-hand-left);
+}
+
 .key.is-upcoming-r::after {
   background: var(--color-hand-right);
 }
 
-.key.is-upcoming-l::after {
-  border: var(--upcoming-marker-line) solid var(--color-hand-left);
-}
-
-.key-black.is-upcoming-r::after {
-  background: var(--stage-hand-right);
-}
-
-.key-black.is-upcoming-l::after {
-  border-color: var(--stage-hand-left);
-}
-
-/* The legend: ● right  ○ left. */
-.hand-shapes {
+/* The legend: cyan = left · magenta = right. */
+.hand-colours {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-5);
@@ -2237,18 +2289,17 @@ select.control {
   color: var(--color-text-muted);
 }
 
-.hand-shape {
+.hand-colour {
   width: var(--spacing-10);
   height: var(--spacing-10);
   border-radius: 50%;
-  box-sizing: border-box;
 }
 
-.hand-shape.is-right {
-  background: var(--color-text);
+.hand-colour.is-left {
+  background: var(--color-hand-left);
 }
 
-.hand-shape.is-left {
-  border: var(--upcoming-marker-line) solid var(--color-text);
+.hand-colour.is-right {
   margin-left: var(--spacing-5);
+  background: var(--color-hand-right);
 }

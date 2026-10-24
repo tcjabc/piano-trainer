@@ -55,47 +55,46 @@
   --color-key-label-strong: var(--neutral-carbon-black);
   --color-key-name-on-black: var(--neutral-pale-stone);
 
-  /* ── Functional colours (the only chromatic tokens) ───────────────── */
-  --color-correct: #2e7d4f;
-  --color-correct-soft: #d8eee0;
-  --color-wrong: #c2412d;
-  --color-wrong-soft: #f6dcd6;
+  /*
+   * ── Feedback ─────────────────────────────────────────────────────────
+   * Neutral: red and green mean fingers, so right and wrong are told by
+   * shape — a tick, or a cross with a short shake — not by hue.
+   */
+  --color-correct: #1f2329;
+  --color-correct-soft: #d4d9df;
+  --color-wrong: #1f2329;
+  --color-wrong-soft: #aab1ba;
   /* Notes that differ when comparing two chords or scales (Library). */
   --color-compare: #5f7d00;
   --color-compare-soft: #e6efc4;
-  /*
-   * Hands in songs (split preview; falling notes use the --stage-hand-* ones).
-   * Muted blue-grey and amber-grey; the hands also differ by shape (left outlined).
-   */
-  --color-hand-left: #56719a;
-  --color-hand-right: #8c7650;
+  /* Hands: left cyan, right magenta (songs, key markers, the hand legend). */
+  --color-hand-left: #00a3c4;
+  --color-hand-right: #d0309f;
   /* Printed music (the song score) is dark on paper in both themes. */
   --color-paper: #ffffff;
   --color-paper-ink: #111111;
   --color-on-functional: var(--neutral-pure-white);
 
   /*
-   * Finger colours 1 (thumb) … 5 (little finger), shared by both hands.
-   * Chosen to stay apart from each other and from correct/wrong, including
-   * under red-green colour blindness, and to keep 4.5:1 contrast with
-   * --color-on-functional so numbers drawn on them stay legible.
+   * Finger colours 1 (thumb) … 5 (little finger), in rainbow order and shared
+   * by both hands: red, orange, yellow, green, blue. Saturated and of similar
+   * weight; numbers on them are drawn dark (--color-on-finger). Staff
+   * fingering text gets a thin outline in the light theme so yellow reads.
    */
-  --finger-1: #8a5a12; /* amber  */
-  --finger-2: #1d5aa6; /* blue   */
-  --finger-3: #7466c4; /* violet */
-  --finger-4: #087692; /* petrol */
-  --finger-5: #8e3a6a; /* plum   */
+  --finger-1: #ec3b30; /* red    */
+  --finger-2: #f5861a; /* orange */
+  --finger-3: #f2c31b; /* yellow */
+  --finger-4: #2fb552; /* green  */
+  --finger-5: #3b82f0; /* blue   */
+  --color-on-finger: #14161a;
+  --finger-text-outline: rgba(20, 22, 26, 0.6);
 
   /* ── Play stage (visualiser) — always dark, in both themes ────────── */
   --stage-bg: #050608;
   --stage-text: #f1f2f3;
-  /*
-   * Falling notes without fingering, by hand: a cool blue-grey (left) and a
-   * warm amber-grey (right). Muted enough to stay clear of the finger colours
-   * and of green/red feedback; the hands also differ by shape (left hollow).
-   */
-  --stage-hand-left: #7f9bc4;
-  --stage-hand-right: #c9a675;
+  /* Hands on the dark stage (falling notes): cyan left, magenta right. */
+  --stage-hand-left: #2fd3f2;
+  --stage-hand-right: #f052c8;
   --stage-text-muted: #8f8f8f;
   --stage-border: rgba(241, 242, 243, 0.14);
   --stage-overlay-bg: rgba(18, 19, 22, 0.62);
@@ -224,12 +223,12 @@
   --split-preview-height: 180px;
   --song-tempo-slider-width: 140px;
   --song-options-width: 340px;
-  /* Suggested (automatic) fingering is drawn this much fainter. */
-  --suggested-opacity: 0.7;
-  /* Upcoming-key markers in songs (filled: right hand, outlined: left). */
+  /* Upcoming-key markers in songs, in the hand's colour. */
   --upcoming-marker-width: 56%;
-  --upcoming-marker-height: 9px;
-  --upcoming-marker-line: 2px;
+  --upcoming-marker-height: 6px;
+  /* Feedback: the wrong-answer shake. */
+  --feedback-shake-distance: 3px;
+  --feedback-shake-duration: 260ms;
   --metronome-pill-height: 28px;
   --metronome-dot-size: 6px;
   --metronome-dot-size-first: 8px;
@@ -280,21 +279,22 @@
     --color-key-out-of-range: var(--neutral-smoke);
     --color-key-label: var(--neutral-iron);
 
-    --color-correct: #4fb27a;
-    --color-correct-soft: #173a27;
-    --color-wrong: #e8735e;
-    --color-wrong-soft: #45201a;
+    --color-correct: #f1f2f3;
+    --color-correct-soft: #4b5058;
+    --color-wrong: #f1f2f3;
+    --color-wrong-soft: #6b717a;
     --color-compare: #c5e352;
     --color-compare-soft: #2f3a10;
-    --color-hand-left: #7f9bc4;
-    --color-hand-right: #c9a675;
+    --color-hand-left: #2fd3f2;
+    --color-hand-right: #f052c8;
     --color-on-functional: var(--neutral-carbon-black);
 
-    --finger-1: #e8ad3a;
-    --finger-2: #3ba5f7;
-    --finger-3: #c8adfd;
-    --finger-4: #97e4f9;
-    --finger-5: #cc79c0;
+    --finger-1: #ff5a4f;
+    --finger-2: #ff9a3d;
+    --finger-3: #ffd83a;
+    --finger-4: #4fd66e;
+    --finger-5: #5c9dff;
+    --finger-text-outline: transparent;
 
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
     color-scheme: dark;
@@ -323,21 +323,22 @@
   --color-key-out-of-range: var(--neutral-smoke);
   --color-key-label: var(--neutral-iron);
 
-  --color-correct: #4fb27a;
-  --color-correct-soft: #173a27;
-  --color-wrong: #e8735e;
-  --color-wrong-soft: #45201a;
+  --color-correct: #f1f2f3;
+  --color-correct-soft: #4b5058;
+  --color-wrong: #f1f2f3;
+  --color-wrong-soft: #6b717a;
   --color-compare: #c5e352;
   --color-compare-soft: #2f3a10;
-  --color-hand-left: #7f9bc4;
-  --color-hand-right: #c9a675;
+  --color-hand-left: #2fd3f2;
+  --color-hand-right: #f052c8;
   --color-on-functional: var(--neutral-carbon-black);
 
-  --finger-1: #e8ad3a;
-  --finger-2: #3ba5f7;
-  --finger-3: #c8adfd;
-  --finger-4: #97e4f9;
-  --finger-5: #cc79c0;
+  --finger-1: #ff5a4f;
+  --finger-2: #ff9a3d;
+  --finger-3: #ffd83a;
+  --finger-4: #4fd66e;
+  --finger-5: #5c9dff;
+  --finger-text-outline: transparent;
 
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
   color-scheme: dark;

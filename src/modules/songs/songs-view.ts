@@ -87,7 +87,7 @@ export class SongsView {
     input.addEventListener('change', () => this.actions.setAutoFingering(input.checked));
     return h(
       'span.checkbox-row.songs-auto-finger',
-      { title: 'Fingering from the file is never changed; suggestions are shown fainter' },
+      { title: 'Fingering from the file is never changed; suggestions are marked as suggested' },
       input,
       h('label.muted', { htmlFor: input.id }, 'Suggest fingering where a song has none'),
     );
@@ -307,8 +307,8 @@ function drawSplitPreview(canvas: HTMLCanvasElement, data: SongData, split: numb
   const end = Math.max(1, ...notes.map((n) => n.beat + n.duration));
   const y = (midi: number) => H - ((midi - lo) / (hi - lo)) * H;
   ctx.clearRect(0, 0, W, H);
-  const left = css.getPropertyValue('--color-hand-left').trim() || '#56657a';
-  const right = css.getPropertyValue('--color-hand-right').trim() || '#7d7466';
+  const left = css.getPropertyValue('--color-hand-left').trim() || '#00a3c4';
+  const right = css.getPropertyValue('--color-hand-right').trim() || '#d0309f';
   const rowH = Math.max(1.5, H / (hi - lo) - 0.5);
   for (const n of notes) {
     ctx.fillStyle = n.hand === 'L' ? left : right;

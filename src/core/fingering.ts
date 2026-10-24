@@ -9,7 +9,7 @@ export type Hand = 'L' | 'R';
 export interface Fingering {
   finger: Finger;
   hand: Hand;
-  /** Suggested by automatic fingering (shown fainter, with a dotted outline). */
+  /** Suggested by automatic fingering (shown with a dotted outline and an italic number). */
   suggested?: boolean;
 }
 

@@ -67,7 +67,8 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
 - **The legend's hand decides which cards come up.** Left hand reads the bass clef and right the treble; chord and scale cards are made for a hand. "Both" means hands together: the chord in each hand, or the scale in parallel octaves.
 - **Notes:** each note (clef + written pitch) is its own card.
   - Wrong = Again; correct in under 1 s = Easy, 1–3 s = Good, over 3 s = Hard.
-  - A wrong note flashes red on the key you played and marks the correct key; the card waits until you play it.
+  - A wrong note flashes the key you played with a ✕ and a short shake, and marks the correct key; the card waits until you play it. A right answer gets a ✓.
+  - Feedback is neutral (white/grey) and told by shape, since red and green are finger colours. It's the same in drills, Library play-along and the song player; the shake is off with reduced motion.
 - **Chords:** the card shows the chord name, plus the staff if you turn that on in Settings.
   - Play it anywhere: pitch classes are compared, so any voicing or octave counts, but the inversion's bass must be lowest.
   - A note outside the chord is wrong at once, and so is letting go without the whole chord. The missing keys (or the bass) are marked and the card waits for the chord.
@@ -99,7 +100,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **On-screen keyboard**: it shows the connected keyboard's keys, read from the device name (e.g. "KeyLab Essential 61" → 61 keys, C2–C7; 25/32/37/49/73/76/88-key names are recognised too). When the name doesn't say, it shows 61 keys. If the drill range goes beyond that, the view widens to include it. The zoom slider (top right of the keyboard, or - = 0) goes from fitting the full range down to about two octaves, and the level is remembered. When zoomed in, the view follows the current card's note and the keys you play. It only scrolls when a key leaves the view, and then recentres, so it doesn't jump on every note. Every C is labelled and middle C (C4) is emphasised. Zooming changes key width only, so nothing above the keyboard moves.
 
-**Hand legend** (bottom right, beside the keyboard): click a hand, or press 1–3, to choose which hand you practise. The left hand reads the bass clef, the right hand the treble clef, and both hands the grand staff. Changing hands mid-session restarts the session with that hand's cards. The fingertips use the finger colours (thumb = 1 … little finger = 5), the same colours used for fingering on the keyboard and the staff; numbers on the fingertips can be turned off in Settings.
+**Hand legend** (bottom right, beside the keyboard): click a hand, or press 1–3, to choose which hand you practise. The left hand reads the bass clef, the right hand the treble clef, and both hands the grand staff. Changing hands mid-session restarts the session with that hand's cards. The fingertips use the finger colours in rainbow order (1 thumb red, 2 orange, 3 yellow, 4 green, 5 little finger blue), the same colours used for fingering on the keyboard and the staff; numbers on the fingertips can be turned off in Settings. Each hand is outlined in its hand colour (left cyan, right magenta).
 
 ### Library
 
@@ -156,9 +157,9 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **The player** (click a song):
 - **Views (V, remembered):**
-  - *Falling notes*: notes fall onto their keys, drawn like the Play visualiser, which shares its renderer and colour presets. They're coloured by finger where fingering is known, by hand, or with the visualiser's colours, with finger numbers and optional note names. The hands differ by shape in every colour mode: right-hand notes are solid, left-hand notes hollow (an outline round a dark centre). A small legend in the player shows this ("● right ○ left").
+  - *Falling notes*: notes fall onto their keys, drawn like the Play visualiser, which shares its renderer and colour presets. They're coloured by finger where fingering is known, by hand, or with the visualiser's colours, with finger numbers and optional note names. Coloured by finger, a note is filled with its finger's colour inside a thin rim and glow in its hand's colour, so both read at once; the cores are mostly colour rather than the visualiser's near-white, so hues stay saturated. A small legend in the player says "cyan = left · magenta = right".
   - *Notation*: the score with a cursor that follows the song, drawn by OpenSheetMusicDisplay. It's MusicXML only and loads on first use.
-- **The keyboard** always shows the next keys to play, with finger numbers where known: a filled marker for the right hand, an outlined one for the left.
+- **The keyboard** always shows the next keys to play, with finger numbers where known, and a marker in the hand's colour (cyan left, magenta right).
 - **Modes:**
   - **Wait** (the default for learning): the song stops at each step until you play its notes; a chord's notes can come in any order. Wrong notes flash and are counted, nothing more. The pass ends as soon as the last note is played.
   - **Play-along**: the song runs at tempo with the metronome, after a bar of count-in. Each note is marked on time, early, late or missed. The windows (±100 ms on time, ±250 ms a hit) are in `src/core/grading.ts`.
@@ -184,11 +185,11 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **Fingering:** taken from the MusicXML where present (from `<notations><technical><fingering>`, as MuseScore, Finale, Sibelius and Dorico write it). Click a falling note while stopped to set or clear its finger (1–5). It's saved with the song and written into its score, so the notation shows it too.
 
-- **Without fingering**, notes are coloured by hand, a muted cool blue-grey (left) and warm amber-grey (right), kept clear of the finger colours and of green/red feedback. The player says so.
+- **Without fingering**, notes are coloured by hand: cyan (left) and magenta (right), clear of the five finger colours. The player says so.
 - **Automatic fingering** (`src/core/autofinger.ts`): when a song is imported, notes without a finger get a suggested one. This is on by default; turn it off with the checkbox in the Songs tab.
   - The player's Options can **Suggest fingering** for an existing song, or **Clear suggested fingering**.
   - Fingering from the file, and fingers you set, are never changed. Setting a suggested finger makes it yours.
-  - Suggestions are shown fainter with an italic number on falling notes, dotted on the keys, and in brackets, like editorial fingering, in the score. The stored score isn't changed.
+  - Suggestions use the same colours, with an italic number on falling notes, dotted on the keys, and in brackets, like editorial fingering, in the score. The stored score isn't changed.
   - The scale and chord tables in `src/core/fingerings.ts` stay the source for Library drills.
 - **How it works:** for each hand, dynamic programming (Viterbi) over the fingers each step could take, minimising an ergonomic cost model in the style of Parncutt et al. (1997), written from scratch.
   - It uses practical, comfortable and relaxed spans for each finger pair, and penalties for weak fingers (half Parncutt's weight), the thumb or little finger on black keys, 3 followed by 4, the same finger on another note, and hand-position changes.
@@ -332,4 +333,4 @@ Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be 
 
 Third-party licences (including the Vadivam icons and the modified hand icon in `src/assets/hand-right.svg`) are listed in `THIRD_PARTY_NOTICES.md`.
 
-Visual rules come from `docs/design-system.md`, adapted for an app: Chillax (weights 500–700) for UI text, with accidentals (♯ ♭ ♮ 𝄪 𝄫) drawn in the Bravura music font through one helper (`src/ui/note-text.ts`) because Chillax has no such glyphs, a monospace stack with tabular figures for changing numbers, Vadivam icons only, achromatic UI apart from correct/wrong feedback and the five finger colours. All values are CSS custom properties in `src/styles/tokens.css`; the dark theme inverts the neutral scale and follows the OS by default.
+Visual rules come from `docs/design-system.md`, adapted for an app: Chillax (weights 500–700) for UI text, with accidentals (♯ ♭ ♮ 𝄪 𝄫) drawn in the Bravura music font through one helper (`src/ui/note-text.ts`) because Chillax has no such glyphs, a monospace stack with tabular figures for changing numbers, Vadivam icons only, achromatic UI apart from the five finger colours (red, orange, yellow, green, blue) and the two hand colours (cyan, magenta); correct/wrong feedback is neutral and told by ✓/✕ and a shake. All values are CSS custom properties in `src/styles/tokens.css`; the dark theme inverts the neutral scale and follows the OS by default.

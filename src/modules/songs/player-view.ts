@@ -567,7 +567,7 @@ export class PlayerView {
             ? h('button.button-outline', { type: 'button', onclick: () => void this.suggestFingering(false) }, 'Clear suggested fingering')
             : null,
         ),
-        h('p.muted.song-options-note', null, 'Suggested fingers are fainter, dotted on the keys and in brackets in the score. Click a falling note while stopped to set its finger.'),
+        h('p.muted.song-options-note', null, 'Suggested fingers have italic numbers on falling notes, are dotted on the keys and in brackets in the score. Click a falling note while stopped to set its finger.'),
       ),
     );
     this.head.replaceChildren(
@@ -592,7 +592,7 @@ export class PlayerView {
         : `${HAND_NAMES[player.config.hands]} · ${MODE_NAMES[player.config.mode]} at ${pct(player.config.tempo)}`;
       this.transport.replaceChildren(
         h('span.song-step-line', null, line),
-        handShapes(),
+        handColours(),
         h('button.button-outline', { type: 'button', disabled: !!this.previewing, onclick: () => this.listenFirst() }, icon('volume-2'), h('span', null, 'Hear it'), h('kbd', null, 'H')),
         h('button.button-outline', { type: 'button', onclick: () => this.restart() }, icon('rotate-ccw'), h('span', null, 'Restart'), h('kbd', null, 'R')),
       );
@@ -607,7 +607,7 @@ export class PlayerView {
       h('button.button-outline', { type: 'button', title: 'Restart (R)', onclick: () => this.restart() }, icon('rotate-ccw')),
       f.segmented<SongMode>('mode', (['wait', 'play-along', 'listen'] as SongMode[]).map((m) => ({ value: m, label: MODE_NAMES[m] })), this.settings.mode, (mode) => this.setSetting({ mode })),
       h('span.song-hands', { title: 'Change with the hand legend or 1 2 3' }, HAND_NAMES[this.hand]),
-      handShapes(),
+      handColours(),
       h(
         'span.song-tempo',
         null,
@@ -723,15 +723,15 @@ export class PlayerView {
   }
 }
 
-/** How the hands look in the falling notes and on the keys. */
-function handShapes(): HTMLElement {
+/** The hands' colours in the falling notes and on the keys. */
+function handColours(): HTMLElement {
   return h(
-    'span.hand-shapes',
-    { title: 'Right-hand notes are solid, left-hand notes are outlined' },
-    h('span.hand-shape.is-right', { 'aria-hidden': 'true' }),
-    h('span', null, 'right'),
-    h('span.hand-shape.is-left', { 'aria-hidden': 'true' }),
-    h('span', null, 'left'),
+    'span.hand-colours',
+    { title: 'Each note glows in its hand’s colour; with fingering, it is filled with the finger’s colour' },
+    h('span.hand-colour.is-left', { 'aria-hidden': 'true' }),
+    h('span', null, 'cyan = left ·'),
+    h('span.hand-colour.is-right', { 'aria-hidden': 'true' }),
+    h('span', null, 'magenta = right'),
   );
 }
 
