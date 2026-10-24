@@ -238,6 +238,11 @@ export class LibraryView {
     this.renderList();
   }
 
+  clearFilters(): void {
+    this.settings.filter = { ...EMPTY_FILTER };
+    this.commit();
+  }
+
   // ── Rendering ────────────────────────────────────────────────────────
 
   private commit(): void {
@@ -268,6 +273,18 @@ export class LibraryView {
   private renderList(): void {
     const n = this.results.length;
     this.countEl.textContent = `${n} ${n === 1 ? 'item' : 'items'}`;
+    if (n === 0 && JSON.stringify(this.settings.filter) !== JSON.stringify(EMPTY_FILTER)) {
+      // Search works within the filters; say so when they hide everything.
+      this.listEl.replaceChildren(
+        h(
+          'p.muted.library-empty',
+          null,
+          'Nothing matches with the current filters. ',
+          h('button.link-button', { type: 'button', onclick: () => this.clearFilters() }, 'Clear filters'),
+        ),
+      );
+      return;
+    }
     this.listEl.replaceChildren(
       ...this.results.map((item) => {
         const badge = this.rowBadge(item);

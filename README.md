@@ -2,10 +2,11 @@
 
 A personal piano-practice PWA driven by a USB MIDI keyboard (built for the Arturia KeyLab Essential, works with any MIDI input). Desktop-first; runs in **Chrome or Edge** (Web MIDI). No backend and no accounts: everything is stored in the browser's IndexedDB.
 
-The app has two areas, switched with the header tabs or **P** / **T**:
+The app has three areas, switched with the header tabs or **P** / **T** / **L**:
 
 - **Play** (opens on launch): free playing. A live grand staff shows what you're holding (chords stacked), with the note names and, for three or more notes, the chord name (via tonal). Optional visualiser (V). Nothing is scored or recorded.
-- **Study**: note reading. A note appears on the staff, you play it, and spaced repetition (FSRS) decides when you see it again. The header's due count is visible from both areas.
+- **Study**: notes, chords and scales with spaced repetition (FSRS). A card appears, you play it, and FSRS decides when you see it again. There's also free practice. The header's due count is visible from every area.
+- **Library** (**L**): every chord and scale. Browse, search, hear it and play along, see its fingering, add it to review, and build decks.
 
 ## Setup
 
@@ -25,7 +26,7 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | `npm run dev` | Vite dev server with hot reload |
 | `npm run build` | Typecheck, then build the production app into `dist/` (with service worker) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | Unit tests (Vitest): grading, card generation, scheduling, storage export/import |
+| `npm test` | Unit tests (Vitest): chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
 | `npm run typecheck` | TypeScript only |
 
 ## Using it
@@ -56,27 +57,41 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
 
 - **Today** shows how many cards are due and roughly how long they take. Press **Space** (or Start) to go through them back to back. When nothing is due, Space starts **Practise ahead** (a few unseen cards plus the soonest-due ones).
 - **Free practice** (the tab next to Today, or **E**) drills whatever you choose, in random order with no limit:
-  - **Choosing notes:** pick a hand (bass, treble or grand staff), then either a range per clef (with ledger-line and accidental options) or specific keys. To pick keys, play them on your keyboard or click the on-screen keys; doing it again removes them.
+  - **What to drill:** Notes, Chords or Scales, in the hand you pick.
+    - Notes: a range per clef (with ledger-line and accidental options), or specific keys picked by playing or clicking them; doing it again removes them.
+    - Chords: by quality, root and inversion.
+    - Scales: by type, tonic and octaves.
   - **Nothing changes your schedule:** attempts are logged, marked as free practice, in a separate `attempts` store and included in the export.
   - **Remembered:** your last selection is kept, and 1/2/3 switch its hand.
-  - **Later:** Chords and Scales are listed for the Phase 2 library.
-- Each note (clef + written pitch) is its own card. Grading is automatic: wrong = Again; correct in under 1 s = Easy, 1–3 s = Good, over 3 s = Hard. Hearing the note first (H) caps the grade at Hard.
-- A wrong note flashes red on the key you played and marks the correct key; the card waits until you play it. Failed cards come back later in the same session.
-- New cards are introduced up to a daily limit (default 10), starting at middle C and working outwards. C♯ and D♭ are separate cards (different staff positions) answered by the same key.
+  - **From the Library:** "Practise now" and a deck's "Practise" use free practice too.
+- **The legend's hand decides which cards come up.** Left hand reads the bass clef and right the treble; chord and scale cards are made for a hand. "Both" means hands together: the chord in each hand, or the scale in parallel octaves.
+- **Notes:** each note (clef + written pitch) is its own card.
+  - Wrong = Again; correct in under 1 s = Easy, 1–3 s = Good, over 3 s = Hard.
+  - A wrong note flashes red on the key you played and marks the correct key; the card waits until you play it.
+- **Chords:** the card shows the chord name, plus the staff if you turn that on in Settings.
+  - Play it anywhere: pitch classes are compared, so any voicing or octave counts, but the inversion's bass must be lowest.
+  - A note outside the chord is wrong at once, and so is letting go without the whole chord. The missing keys (or the bass) are marked and the card waits for the chord.
+  - Correct in under 2.5 s = Easy, up to 6 s = Good, longer = Hard.
+- **Scales:** the card shows the scale name; play it ascending, or up and down (Settings).
+  - Notes are checked in order. A wrong note is marked and counted, and you carry on from the note that was expected.
+  - Graded at the end: more than two wrong notes = Again; otherwise speed per note decides. Fingering is shown on the keys unless F hides it.
+- **Thresholds:** all grading thresholds are in one config, `src/core/grading.ts`. Hearing the answer first (H) caps the grade at Hard. Failed cards come back later in the same session.
+- **New cards:** each kind has its own daily limit for new cards (Settings → Study; defaults notes 10, chords 5, scales 3), so adding a big deck never crowds out the rest. Due reviews are never limited. New notes start at middle C and work outwards; chords and scales come in the order you added them. C♯ and D♭ are separate note cards (different staff positions) answered by the same key.
+- **Identity:** a chord card is root + quality + inversion + hand; a scale card is tonic + type + hand + octaves.
 
 | Key | Action |
 | --- | --- |
 | Space | Start / pause |
 | R | Restart the current card (resets the timer) |
 | → | Skip the card (it moves to the end of the session) |
-| H | Hear the correct note |
-| Esc | Back to Today |
+| H | Hear the answer (note, chord, scale) |
+| Esc | Back to Today (or wherever the drill was started) |
 | S | Settings (from Today) |
 | 1 / 2 / 3 | Practise the left hand / right hand / both |
-| P / T | Go to Play / Study (on every screen) |
+| P / T / L | Go to Play / Study / Library (on every screen) |
 | E | Free practice |
 | ← | Previous card, replayed as ungraded practice |
-| F | Fingertip numbers on/off (fingering) |
+| F | Fingering on/off everywhere (keys, staff, hand legend) |
 | - / = / 0 | Zoom the on-screen keyboard out / in / fit the full range |
 
 The on-screen keys can also be clicked, which helps when no MIDI keyboard is connected.
@@ -85,7 +100,39 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **Hand legend** (bottom right, beside the keyboard): click a hand, or press 1–3, to choose which hand you practise. The left hand reads the bass clef, the right hand the treble clef, and both hands the grand staff. Changing hands mid-session restarts the session with that hand's cards. The fingertips use the finger colours (thumb = 1 … little finger = 5), the same colours used for fingering on the keyboard and the staff; numbers on the fingertips can be turned off in Settings.
 
-**Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new cards per day, theme (system/light/dark), finger numbers, and JSON export/import of all data. Import merges by record, and the newer change wins.
+### Library
+
+| Key | Action |
+| --- | --- |
+| / | Search: "F#m7", "Bb maj7 1st inv", "C/E", "D dorian", "add9", "half diminished" |
+| ↑ / ↓ | Previous / next result |
+| H | Hear it: a chord as a block, a scale up and down |
+| A | Hear a chord as an arpeggio |
+| Space | Practise now (free practice with just this item) |
+| R | Add to / remove from review |
+| 1 / 2 / 3 | Left / right / both hands |
+| Esc | Clear the search |
+
+- **Contents:** 15 chord qualities with every inversion (major, minor, diminished, augmented, sus2, sus4, 6, m6, 7, maj7, m7, m7♭5, dim7, add9, 9) and 15 scale types (major, natural/harmonic/melodic minor, the seven modes, major and minor pentatonic, blues, chromatic). That's 947 items, generated with tonal.
+- **Spelling:** roots use key spelling, with both spellings offered where both are common (C♯/D♭ and F♯/G♭ major, D♯/E♭ minor). Chromatic scales are spelled with sharps (flats from flat tonics). The blues ♭5 is written ♯4 where it would need a double flat.
+- **Filters:** type, chord quality, inversion, scale type, root, hand and scale octaves. Search works within the filters; if they hide everything, the list offers to clear them.
+- **Detail panel:** the name, the formula as degrees (1–♭3–5), the notes, a grand staff, and the item's keys marked on the keyboard, with fingering in the finger colours on the keys and above (right hand) or below (left hand) the notes.
+- **Review:** whether the item is in review for the current hand, and when it's next due. "Remove from review" keeps the card's history, so adding it again picks up where it left off.
+- **Play along:** play the item on your keyboard and a quiet tick appears. Nothing is scored.
+- **Decks** (in the sidebar) are saved filters.
+  - Save the current filters as a deck, rename it, point it at the current filters again, or delete it. Click a deck to show it.
+  - Each deck shows its progress (items · in review · due) and can add all its items to review or be practised freely.
+  - Starter decks are added on first run (major triads in C/G/F/D, minor triads in A/E/D, dominant 7ths, minor 7ths in flat keys, major scales with sharps / flats, harmonic minor scales). None of them go into review until you ask.
+
+**Fingering** (`src/core/fingerings.ts`, stored as data so songs can reuse it):
+- **Scales:** all 12 major and the natural/harmonic/melodic minor scales, both hands, one or two octaves, using the usual published fingerings (including the black-key-start exceptions). Also the chromatic scale.
+- **No fingering:** modes, pentatonics and blues have no standard fingering, so none is shown (ionian and aeolian use major and natural minor).
+- **Triads:** RH 1-3-5 (first inversion 1-2-5); LH 5-3-1 (second inversion 5-2-1).
+- **Four-note chords:** RH 1-2-3-5 or 1-2-4-5, and LH 5-3-2-1 or 5-4-2-1, depending on where the second falls.
+- **Ninths:** all five fingers.
+- **F** hides fingering everywhere.
+
+**Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings). Import merges by record, and the newer change wins.
 
 ## Controller buttons, pads and knobs (MIDI learn)
 
@@ -94,7 +141,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Ports:** the app listens on every MIDI port of the connected device, including the KeyLab's DAW port ("MIDIIN2 …") where the transport buttons send Mackie Control notes. Only the keys port plays notes. Messages from other ports never make a sound.
 - **What can be learned:** note-on pads, CC buttons (value above 63 is a press; only the press triggers), Mackie transport buttons, and HUI buttons (zone + port). Piano keys can't be learned. That means notes from the keys port within the keyboard's range, except on channel 10 where pads usually send. The sustain pedal can't be learned either.
 - **Mapped controls only run actions:** they never also play a note or count as a drill answer.
-- **Actions:** Play area, Study area, Start/pause, Restart card, Skip/next, Previous, Hear answer, Toggle visualiser, Toggle fingering, Left/Right/Both hands, Zoom in/out, Settings and Back. A mapped control does what the matching key does on the current screen; where that key does nothing, so does the control.
+- **Actions:** Play area, Study area, Library, Start/pause, Restart card, Skip/next, Previous, Hear answer, Toggle visualiser, Toggle fingering, Left/Right/Both hands, Zoom in/out, Settings and Back. A mapped control does what the matching key does on the current screen; where that key does nothing, so does the control.
 - **Knobs:** *Keyboard zoom (knob)* takes a knob. Its encoding (absolute, or one of three relative styles) is guessed from the first few values while you turn it. You can change it in the row if the guess is wrong. Tempo will be added here later.
 - **Saving:** mappings are stored in settings and included in the JSON export. When there's room, the hint bar shows the mapped control next to each key.
 
@@ -133,12 +180,18 @@ src/
     controls.ts    MIDI learn: actions, learned controls, HUI and knob decoding
     audio.ts       smplr piano, velocity, sustain pedal, AudioContext resume
     notation.ts    VexFlow drawing: notes and chords on treble, bass, grand staff
-    scheduler.ts   ts-fsrs wrapper, auto-grading, session queue
-    storage.ts     the only IndexedDB module (cards, reviews, settings, export/import)
+    scheduler.ts   ts-fsrs wrapper, session queue
+    grading.ts     grading thresholds for notes, chords and scales (one config)
+    storage.ts     the only IndexedDB module (cards, reviews, settings, attempts, decks, export/import)
+    chords.ts      chord qualities, roots, spelling, inversions, formulas, voicings
+    scales.ts      scale types, tonics, spelling, played sequences
+    fingerings.ts  standard fingerings as data (scales, chords, both hands)
     fingering.ts   finger colours 1–5 and hand markers
     pitch.ts       note names, MIDI numbers, ledger lines
     settings.ts    settings shape and defaults
-  modules/notes/ the note-drill module (card set, deck planning, drill controller)
+  modules/notes/ note cards, today's plan, free practice selection
+  modules/drill/ the drill (one card at a time), tasks for notes/chords/scales, chord/scale checking, sources
+  modules/library/ catalog and search, Library view, decks, review status
   modules/play/  Play area: live staff and chord readout, chord detection, visualiser
   ui/            header, keyboard, hand legend, staff panel, Today, settings, hotkeys, app shell
   assets/        hand-right.svg (modified Vadivam "hand" icon)
@@ -146,7 +199,7 @@ src/
 build/vadivam.ts Vite plugin that inlines the Vadivam icons listed in src/ui/icon-list.ts
 ```
 
-Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later. Stores: `cards`, `reviews` (FSRS reviews), `settings` and `attempts` (free practice; database version 2 adds it without touching existing data).
+Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later. Stores: `cards`, `reviews` (FSRS reviews), `settings`, `attempts` (free practice; added in database version 2) and `decks` (version 3). Each upgrade only creates what an older database is missing.
 
 ## Design
 

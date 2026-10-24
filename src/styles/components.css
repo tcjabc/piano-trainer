@@ -1394,3 +1394,18 @@ select.control {
 .deck-name-input {
   flex: 1 1 100%;
 }
+
+.library-empty {
+  padding: var(--spacing-10);
+  font-size: var(--text-caption);
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  text-decoration: underline;
+  cursor: pointer;
+}
