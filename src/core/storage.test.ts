@@ -45,7 +45,7 @@ describe('storage', () => {
     const file = JSON.parse(JSON.stringify(await db.exportAll()));
 
     const other = new Storage(`test-${++n}`);
-    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1, attempts: 0, decks: 0 });
+    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1, attempts: 0, decks: 0, songs: 0, songProgress: 0 });
     expect(await other.getCards('notes')).toEqual([result.card]);
     expect((await other.getSettings()).theme).toBe('light');
     await other.close();
@@ -119,6 +119,59 @@ describe('storage', () => {
     } as Parameters<Storage['putDeck']>[0];
     await upgraded.putDeck(deck);
     expect((await upgraded.exportAll()).decks).toEqual([deck]);
+    await upgraded.close();
+  });
+
+  it('upgrades a version 3 database to add songs, keeping cards, attempts and decks', async () => {
+    const name = `test-${++n}`;
+    const card = newCard({ clef: 'treble', spelling: 'G4', midi: 67 }, NOW);
+    const deck = {
+      id: 'd1', name: 'Triads', filter: { kinds: ['chord'], qualities: ['M'], scaleTypes: [], roots: ['C'], inversions: [] },
+      octaves: 1, starter: true, createdAt: NOW, updatedAt: NOW,
+    };
+    const v3 = await openDB(name, 3, {
+      upgrade(d) {
+        const cards = d.createObjectStore('cards', { keyPath: 'id' });
+        cards.createIndex('key', 'key', { unique: true });
+        cards.createIndex('module', 'module');
+        const reviews = d.createObjectStore('reviews', { keyPath: 'id' });
+        reviews.createIndex('cardId', 'cardId');
+        reviews.createIndex('reviewedAt', 'reviewedAt');
+        d.createObjectStore('settings', { keyPath: 'id' }).createIndex('key', 'key', { unique: true });
+        d.createObjectStore('attempts', { keyPath: 'id' }).createIndex('at', 'at');
+        d.createObjectStore('decks', { keyPath: 'id' });
+      },
+    });
+    await v3.put('cards', card);
+    await v3.put('decks', deck);
+    v3.close();
+
+    const upgraded = new Storage(name);
+    expect(await upgraded.getCards('notes')).toEqual([card]);
+    expect(await upgraded.getDecks()).toEqual([deck]);
+    expect(await upgraded.getSongs()).toEqual([]);
+    const song = {
+      id: 's1', title: 'Ode to Joy', artist: 'Beethoven', format: 'musicxml' as const, fileName: 'ode.musicxml', musicXml: '<score-partwise/>',
+      data: { notes: [], measures: [], tempos: [], timeSignature: [4, 4] as [number, number], key: null },
+      sections: [{ id: 's0', name: 'Bars 1–4', start: 0, end: 4 }], bundled: null, createdAt: NOW, updatedAt: NOW,
+    };
+    await upgraded.putSong(song);
+    await upgraded.putSongProgress({
+      id: 's1:s0', songId: 's1', sectionId: 's0', step: 1, streak: 0, speedTempo: 0.6, bestTempo: 0.6,
+      lastAccuracy: 1, bestAccuracy: 1, lastPractised: NOW, passes: 2, updatedAt: NOW,
+    });
+    const songCard = { ...newCard({ clef: 'treble', spelling: 'C4', midi: 60 }, NOW), id: 'sc', key: 'songs:s1:s0', module: 'songs', content: { songId: 's1', sectionId: 's0' } } as unknown as Parameters<Storage['putCard']>[0];
+    await upgraded.putCard(songCard);
+    const exported = await upgraded.exportAll();
+    expect(exported.songs).toEqual([song]);
+    expect(exported.songProgress).toHaveLength(1);
+
+    // Deleting the song takes its progress and section cards with it, and nothing else.
+    await upgraded.deleteSong('s1');
+    expect(await upgraded.getSongs()).toEqual([]);
+    expect(await upgraded.getSongProgress('s1')).toEqual([]);
+    expect(await upgraded.getCards('songs')).toEqual([]);
+    expect(await upgraded.getCards('notes')).toEqual([card]);
     await upgraded.close();
   });
 

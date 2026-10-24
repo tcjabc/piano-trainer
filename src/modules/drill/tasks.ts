@@ -287,5 +287,6 @@ export class ScaleTask implements Task {
 export const baseTasks: TaskFactory = (item, host, noteStaff) => {
   if (item.module === 'notes') return new NoteTask(item.content, host, noteStaff);
   if (item.module === 'chords') return new ChordTask(item.content, host);
-  return new ScaleTask(item.content, host);
+  if (item.module === 'scales') return new ScaleTask(item.content, host);
+  return null;
 };

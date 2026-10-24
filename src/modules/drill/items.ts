@@ -13,6 +13,7 @@ import {
   type NoteCardContent,
   type ScaleCard,
   type ScaleCardContent,
+  type SongCardContent,
 } from '../../core/storage';
 import { cardKey as noteCardKey } from '../notes/cards';
 import { chordItemId, itemById, scaleItemId, type ChordItem, type LibraryItem, type ScaleItem } from '../library/catalog';
@@ -20,7 +21,8 @@ import { chordItemId, itemById, scaleItemId, type ChordItem, type LibraryItem, t
 export type DrillItem =
   | { id: string; module: 'notes'; content: NoteCardContent }
   | { id: string; module: 'chords'; content: ChordCardContent }
-  | { id: string; module: 'scales'; content: ScaleCardContent };
+  | { id: string; module: 'scales'; content: ScaleCardContent }
+  | { id: string; module: 'songs'; content: SongCardContent };
 
 export function chordCardKey(c: ChordCardContent): string {
   return `chords:${c.root}:${c.quality}:${c.inversion}:${c.hand}`;

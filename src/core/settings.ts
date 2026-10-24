@@ -81,6 +81,31 @@ export interface ScaleDrillSettings {
   direction: 'up' | 'updown';
 }
 
+/** How a song is shown and played. */
+export type SongView = 'falling' | 'notation';
+/** Falling notes coloured by hand, by finger (where fingering is known), or with the visualiser's colours. */
+export type SongColors = 'hand' | 'finger' | 'preset';
+/** What happens to the hand you aren't playing: silent, played by the app, or not shown. */
+export type OtherHand = 'mute' | 'play' | 'hide';
+
+export interface SongSettings {
+  /** New song-section cards per day. */
+  newPerDay: number;
+  view: SongView;
+  colors: SongColors;
+  noteNames: boolean;
+  otherHand: OtherHand;
+  mode: 'wait' | 'play-along' | 'listen';
+  /** Tempo factor for free practice (1 = as written). */
+  tempo: number;
+  /** After a clean pass of the loop, go 5% faster until 100%. */
+  progressiveTempo: boolean;
+  /** A bar of metronome count-in before play-along and loops. */
+  countIn: boolean;
+  /** The bundled public-domain songs have been added (once; they can be deleted). */
+  bundledAdded: boolean;
+}
+
 /** The Library's remembered state. */
 export interface LibrarySettings {
   filter: LibraryFilter;
@@ -90,6 +115,8 @@ export interface LibrarySettings {
   octaves: 1 | 2;
   /** The detail panel's About section is open. */
   aboutOpen: boolean;
+  /** Chords and scales, or songs. */
+  tab: 'items' | 'songs';
 }
 
 export interface Settings {
@@ -117,6 +144,7 @@ export interface Settings {
   /** After a chord or scale card in Study, a one-line reminder of what it is. */
   theoryReminders: boolean;
   metronome: MetronomeSettings;
+  songs: SongSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -150,12 +178,24 @@ export const DEFAULT_SETTINGS: Settings = {
     scales: { ...EMPTY_FILTER, kinds: ['scale'], scaleTypes: ['major'], roots: ['C', 'G', 'F'] },
     octaves: 1,
   },
-  library: { filter: EMPTY_FILTER, selected: null, octaves: 1, aboutOpen: true },
+  library: { filter: EMPTY_FILTER, selected: null, octaves: 1, aboutOpen: true, tab: 'items' },
   chordDrill: { newPerDay: 5, showStaff: false },
   scaleDrill: { newPerDay: 3, direction: 'up' },
   starterDecksAdded: false,
   theoryReminders: false,
   metronome: DEFAULT_METRONOME,
+  songs: {
+    newPerDay: 2,
+    view: 'falling',
+    colors: 'finger',
+    noteNames: false,
+    otherHand: 'play',
+    mode: 'wait',
+    tempo: 1,
+    progressiveTempo: false,
+    countIn: true,
+    bundledAdded: false,
+  },
 };
 
 const CLEF_FOR_HAND: Record<HandChoice, ClefChoice> = { left: 'bass', right: 'treble', both: 'both' };
@@ -211,6 +251,7 @@ export function withDefaults(partial: LegacySettings | undefined): Settings {
     chordDrill: { ...DEFAULT_SETTINGS.chordDrill, ...partial?.chordDrill },
     scaleDrill: { ...DEFAULT_SETTINGS.scaleDrill, ...partial?.scaleDrill },
     metronome: metronomeWithDefaults(partial?.metronome),
+    songs: { ...DEFAULT_SETTINGS.songs, ...partial?.songs },
     freePractice: {
       ...DEFAULT_SETTINGS.freePractice,
       ...partial?.freePractice,

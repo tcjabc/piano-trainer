@@ -72,7 +72,7 @@ export class TodayView {
 
 /** "Notes 6 · Chords 3 · Scales 1" when more than notes are due. */
 function kindsLine(summary: TodaySummary): HTMLElement {
-  const labels = { notes: 'Notes', chords: 'Chords', scales: 'Scales' } as const;
+  const labels = { notes: 'Notes', chords: 'Chords', scales: 'Scales', songs: 'Song sections' } as const;
   const parts = (Object.keys(labels) as (keyof typeof labels)[])
     .map((k) => [labels[k], summary.counts[k].reviews + summary.counts[k].new] as const)
     .filter(([, n]) => n > 0);

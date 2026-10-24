@@ -672,6 +672,7 @@ export class App {
       notes: s.noteDrill.newPerDay,
       chords: s.chordDrill.newPerDay,
       scales: s.scaleDrill.newPerDay,
+      songs: s.songs.newPerDay,
     });
     this.summary = summary;
     this.today.update(summary);

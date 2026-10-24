@@ -1,8 +1,10 @@
 /**
- * Today's study plan across notes, chords and scales: due reviews, and new
- * cards up to each kind's own daily limit. Note cards are kept in step with
- * the note-drill options; chord and scale cards exist once added from the
- * Library. Only cards for the practised hand are included.
+ * Today's study plan across notes, chords, scales and song sections: due
+ * reviews, and new cards up to each kind's own daily limit. Note cards are
+ * kept in step with the note-drill options; chord, scale and song cards
+ * exist once added from the Library. Note, chord and scale cards are for
+ * the practised hand; a song section's card brings its own hands (the step
+ * of the learning path it has reached).
  */
 import {
   getDueCards,
@@ -21,6 +23,8 @@ const DEFAULT_SECONDS_PER_CARD = 4;
 /** Rough seconds per chord and per scale card (no history needed). */
 const SECONDS_PER_CHORD = 6;
 const SECONDS_PER_SCALE = 10;
+/** A pass through a song section, roughly. */
+const SECONDS_PER_SONG_SECTION = 60;
 /** Time between cards (feedback flash, drawing). */
 const OVERHEAD_SECONDS = 0.6;
 /** New cards are seen several times on their first day (learning steps); reviews sometimes fail. */
@@ -78,6 +82,12 @@ async function addedCards(module: 'chords' | 'scales', hand: HandChoice): Promis
   return cards.filter((c) => c.content.hand === hand && !c.suspended).sort((a, b) => a.createdAt - b.createdAt);
 }
 
+/** Song section cards in review (any hand), oldest added first. */
+async function songCards(): Promise<CardRecord[]> {
+  const cards = await storage.getCards('songs');
+  return cards.filter((c) => !c.suspended).sort((a, b) => a.createdAt - b.createdAt);
+}
+
 /** Merge lists in turn (a, b, c, a, b, c, …) so no kind of new card comes all at once. */
 function roundRobin<T>(lists: T[][]): T[] {
   const out: T[] = [];
@@ -94,20 +104,23 @@ export async function summariseToday(
   const notes = await syncPool(options, now);
   const chords = await addedCards('chords', hand);
   const scales = await addedCards('scales', hand);
+  const songs = await songCards();
   const reviewsToday = await storage.getReviewsSince(startOfDay(now));
 
   const plans = {
     notes: planToday(notes, notes, limits.notes, newIntroducedToday(reviewsToday, 'notes'), now),
     chords: planToday(chords, chords, limits.chords, newIntroducedToday(reviewsToday, 'chords'), now),
     scales: planToday(scales, scales, limits.scales, newIntroducedToday(reviewsToday, 'scales'), now),
+    songs: planToday(songs, songs, limits.songs, newIntroducedToday(reviewsToday, 'songs'), now),
   };
-  const pool: CardRecord[] = [...notes, ...chords, ...scales];
+  const pool: CardRecord[] = [...notes, ...chords, ...scales, ...songs];
   const reviews = getDueCards(pool, now);
-  const newCards = roundRobin([plans.notes.newCards, plans.chords.newCards, plans.scales.newCards]);
+  const newCards = roundRobin([plans.notes.newCards, plans.chords.newCards, plans.scales.newCards, plans.songs.newCards]);
   const counts = {
     notes: { reviews: plans.notes.reviews.length, new: plans.notes.newCards.length },
     chords: { reviews: plans.chords.reviews.length, new: plans.chords.newCards.length },
     scales: { reviews: plans.scales.reviews.length, new: plans.scales.newCards.length },
+    songs: { reviews: plans.songs.reviews.length, new: plans.songs.newCards.length },
   };
 
   const recent = await storage.getRecentReviews(50);
@@ -116,7 +129,7 @@ export async function summariseToday(
     notesRecent.length > 0
       ? notesRecent.reduce((sum, r) => sum + Math.min(r.responseMs, 10_000), 0) / notesRecent.length / 1000
       : DEFAULT_SECONDS_PER_CARD;
-  const per: Record<CardModule, number> = { notes: perNote, chords: SECONDS_PER_CHORD, scales: SECONDS_PER_SCALE };
+  const per: Record<CardModule, number> = { notes: perNote, chords: SECONDS_PER_CHORD, scales: SECONDS_PER_SCALE, songs: SECONDS_PER_SONG_SECTION };
   const seconds = (Object.keys(counts) as CardModule[]).reduce(
     (sum, m) => sum + (per[m] + OVERHEAD_SECONDS) * (counts[m].reviews * REVIEW_SHOWINGS + counts[m].new * NEW_CARD_SHOWINGS),
     0,

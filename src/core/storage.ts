@@ -7,6 +7,8 @@ import type { ChordQuality } from './chords';
 import type { LibraryFilter } from './filter';
 import type { Clef } from './pitch';
 import type { ScaleType } from './scales';
+import type { Section, SongData } from './song';
+import type { SectionProgress } from './song-learning';
 import { withDefaults, type HandChoice, type Settings } from './settings';
 
 /** FSRS card state as stored: dates are epoch ms so records survive JSON round trips. */
@@ -47,6 +49,12 @@ export interface ScaleCardContent {
   octaves: 1 | 2;
 }
 
+/** A section of a song; it is practised at the step of the learning path it has reached. */
+export interface SongCardContent {
+  songId: string;
+  sectionId: string;
+}
+
 interface CardBase {
   id: string;
   /** Unique, human-readable identity, e.g. "notes:treble:C#4", "chords:F#:m7:1:right". */
@@ -61,7 +69,8 @@ interface CardBase {
 export type NoteCard = CardBase & { module: 'notes'; content: NoteCardContent };
 export type ChordCard = CardBase & { module: 'chords'; content: ChordCardContent };
 export type ScaleCard = CardBase & { module: 'scales'; content: ScaleCardContent };
-export type CardRecord = NoteCard | ChordCard | ScaleCard;
+export type SongCard = CardBase & { module: 'songs'; content: SongCardContent };
+export type CardRecord = NoteCard | ChordCard | ScaleCard | SongCard;
 export type CardModule = CardRecord['module'];
 export type CardContent = CardRecord['content'];
 
@@ -121,6 +130,31 @@ export interface DeckRecord {
   updatedAt: number;
 }
 
+/** An imported (or bundled) song. */
+export interface SongRecord {
+  id: string;
+  title: string;
+  artist: string;
+  format: 'midi' | 'musicxml';
+  fileName: string;
+  /** The score, for the notation view (MusicXML only; .mxl is stored unzipped). */
+  musicXml: string | null;
+  data: SongData;
+  sections: Section[];
+  /** Which bundled song this is ("ode-to-joy"), or null for an import. */
+  bundled: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Learning-path progress and stats for one section; id is "songId:sectionId". */
+export interface SongProgressRecord extends SectionProgress {
+  id: string;
+  songId: string;
+  sectionId: string;
+  updatedAt: number;
+}
+
 export interface ExportFile {
   app: 'piano-trainer';
   schemaVersion: 1;
@@ -132,6 +166,9 @@ export interface ExportFile {
   attempts?: AttemptRecord[];
   /** Decks (missing in exports made before decks existed). */
   decks?: DeckRecord[];
+  /** Songs and their progress (missing in exports made before songs existed). */
+  songs?: SongRecord[];
+  songProgress?: SongProgressRecord[];
 }
 
 export interface ImportSummary {
@@ -140,6 +177,8 @@ export interface ImportSummary {
   settings: number;
   attempts: number;
   decks: number;
+  songs: number;
+  songProgress: number;
 }
 
 interface TrainerDB extends DBSchema {
@@ -167,10 +206,19 @@ interface TrainerDB extends DBSchema {
     key: string;
     value: DeckRecord;
   };
+  songs: {
+    key: string;
+    value: SongRecord;
+  };
+  songProgress: {
+    key: string;
+    value: SongProgressRecord;
+    indexes: { songId: string };
+  };
 }
 
-/** v1: cards, reviews, settings. v2: free-practice attempts. v3: decks. */
-const DB_VERSION = 3;
+/** v1: cards, reviews, settings. v2: free-practice attempts. v3: decks. v4: songs. */
+const DB_VERSION = 4;
 
 export function uuid(): string {
   return crypto.randomUUID();
@@ -201,6 +249,10 @@ export class Storage {
         }
         if (oldVersion < 3) {
           db.createObjectStore('decks', { keyPath: 'id' });
+        }
+        if (oldVersion < 4) {
+          db.createObjectStore('songs', { keyPath: 'id' });
+          db.createObjectStore('songProgress', { keyPath: 'id' }).createIndex('songId', 'songId');
         }
       },
     });
@@ -299,6 +351,41 @@ export class Storage {
     await (await this.db()).delete('decks', id);
   }
 
+  // ── Songs ──────────────────────────────────────────────────────────────
+
+  async getSongs(): Promise<SongRecord[]> {
+    const songs = await (await this.db()).getAll('songs');
+    return songs.sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  async getSong(id: string): Promise<SongRecord | undefined> {
+    return (await this.db()).get('songs', id);
+  }
+
+  async putSong(song: SongRecord): Promise<void> {
+    await (await this.db()).put('songs', song);
+  }
+
+  /** Delete a song with its progress and its section cards (their review history stays). */
+  async deleteSong(id: string): Promise<void> {
+    const db = await this.db();
+    const tx = db.transaction(['songs', 'songProgress', 'cards'], 'readwrite');
+    await tx.objectStore('songs').delete(id);
+    const progress = await tx.objectStore('songProgress').index('songId').getAllKeys(id);
+    for (const key of progress) await tx.objectStore('songProgress').delete(key);
+    const cards = (await tx.objectStore('cards').index('module').getAll('songs')) as SongCard[];
+    for (const card of cards) if (card.content.songId === id) await tx.objectStore('cards').delete(card.id);
+    await tx.done;
+  }
+
+  async getSongProgress(songId: string): Promise<SongProgressRecord[]> {
+    return (await this.db()).getAllFromIndex('songProgress', 'songId', songId);
+  }
+
+  async putSongProgress(record: SongProgressRecord): Promise<void> {
+    await (await this.db()).put('songProgress', record);
+  }
+
   // ── Settings ───────────────────────────────────────────────────────────
 
   async getSettings(): Promise<Settings> {
@@ -325,6 +412,8 @@ export class Storage {
       settings: await db.getAll('settings'),
       attempts: await db.getAll('attempts'),
       decks: await db.getAll('decks'),
+      songs: await db.getAll('songs'),
+      songProgress: await db.getAll('songProgress'),
     };
   }
 
@@ -335,8 +424,8 @@ export class Storage {
   async importAll(data: unknown): Promise<ImportSummary> {
     const file = validateExport(data);
     const db = await this.db();
-    const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts', 'decks'], 'readwrite');
-    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0, decks: 0 };
+    const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts', 'decks', 'songs', 'songProgress'], 'readwrite');
+    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0, decks: 0, songs: 0, songProgress: 0 };
 
     const cards = tx.objectStore('cards');
     for (const incoming of file.cards) {
@@ -383,6 +472,22 @@ export class Storage {
       summary.decks++;
     }
 
+    const songs = tx.objectStore('songs');
+    for (const incoming of file.songs ?? []) {
+      const existing = await songs.get(incoming.id);
+      if (existing && existing.updatedAt >= incoming.updatedAt) continue;
+      await songs.put(incoming);
+      summary.songs++;
+    }
+
+    const songProgress = tx.objectStore('songProgress');
+    for (const incoming of file.songProgress ?? []) {
+      const existing = await songProgress.get(incoming.id);
+      if (existing && existing.updatedAt >= incoming.updatedAt) continue;
+      await songProgress.put(incoming);
+      summary.songProgress++;
+    }
+
     await tx.done;
     return summary;
   }
@@ -396,7 +501,7 @@ function validateExport(data: unknown): ExportFile {
   const hasIds = (rows: unknown) =>
     Array.isArray(rows) &&
     rows.every((r) => typeof r?.id === 'string' && typeof r?.updatedAt === 'number');
-  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || (f.attempts !== undefined && !hasIds(f.attempts)) || (f.decks !== undefined && !hasIds(f.decks))) {
+  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || (f.attempts !== undefined && !hasIds(f.attempts)) || (f.decks !== undefined && !hasIds(f.decks)) || (f.songs !== undefined && !hasIds(f.songs)) || (f.songProgress !== undefined && !hasIds(f.songProgress))) {
     throw new Error('The export file is incomplete or damaged.');
   }
   return f as ExportFile;
