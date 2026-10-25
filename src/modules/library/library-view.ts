@@ -23,6 +23,8 @@ export interface LibraryActions {
   /** The filter, selection or octaves changed (to be remembered). */
   change: (settings: LibrarySettings) => void;
   setHand: (hand: HandChoice) => void;
+  /** The selected item was played (the tick): for the stats, with how many notes it took. */
+  played?: (item: LibraryItem, notes: number) => void;
 }
 
 const TICK_MS = 1600;
@@ -226,7 +228,7 @@ export class LibraryView {
     const item = this.selected;
     if (!item || !this.active) return;
     if (item.kind === 'chord') {
-      if (checkChord(held, chordTarget(item, this.hand)).complete) this.tick();
+      if (checkChord(held, chordTarget(item, this.hand)).complete) this.tick(item, 1);
       return;
     }
     this.tracker ??= this.newTracker(item);
@@ -238,7 +240,7 @@ export class LibraryView {
       if (step === 'wrong') this.tracker = null;
     }
     if (step === 'done') {
-      this.tick();
+      this.tick(item, this.tracker!.length);
       this.tracker = null;
     }
   }
@@ -247,7 +249,8 @@ export class LibraryView {
     return new ScaleTracker(scaleReference(item, this.settings.octaves, 'up'), this.hand === 'both');
   }
 
-  private tick(): void {
+  private tick(item: LibraryItem, notes: number): void {
+    this.actions.played?.(item, notes);
     window.clearTimeout(this.tickTimer);
     this.tickEl.classList.add('is-shown');
     this.tickTimer = window.setTimeout(() => this.tickEl.classList.remove('is-shown'), TICK_MS);

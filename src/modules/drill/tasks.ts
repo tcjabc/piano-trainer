@@ -14,6 +14,7 @@ import type { Keyboard } from '../../ui/keyboard';
 import type { StaffView } from '../../ui/staff';
 import type { ChordItem, ScaleItem } from '../library/catalog';
 import { chordTarget, fingers, notation, scaleReference, voicings } from '../library/voicing';
+import { detectChord } from '../play/harmony';
 import { checkChord, ScaleTracker, type ChordCheck } from './check';
 import { libraryItemFor, type DrillItem, type DrillOptions } from './items';
 import type { Outcome } from './sources';
@@ -28,6 +29,10 @@ export interface TaskHost {
   outcome(o: Outcome): void;
   /** Done: success flash, then the next card. */
   complete(): void;
+  /** For the stats: a right or wrong chord attempt or scale note (every one, not just the first). */
+  tally(correct: boolean): void;
+  /** For the stats: a chord attempt that was another chord, e.g. "C7". */
+  confused(playedSymbol: string): void;
   /** Show this element in place of the staff panel (null puts the staff back). */
   stage(el: HTMLElement | null): void;
 }
@@ -108,11 +113,15 @@ export class NoteTask implements Task {
  * compared, so any voicing or octave counts, but the inversion's bass must
  * be lowest. A note outside the chord is wrong at once; letting go without
  * the whole chord is wrong too. Either way the missing keys are shown and
- * the card waits for the chord.
+ * the card waits for the chord. For the stats, each attempt (keys down until
+ * all are let go) is one hit or one miss, and a missed attempt that formed
+ * another chord is a confusion.
  */
 export class ChordTask implements Task {
   private item: ChordItem;
   private attempt = new Set<number>();
+  /** This attempt has already been counted as a miss. */
+  private missed = false;
 
   constructor(
     private c: ChordCardContent,
@@ -142,21 +151,44 @@ export class ChordTask implements Task {
     const check = checkChord(held, chordTarget(this.item, this.c.hand));
     if (check.complete) {
       this.host.outcome({ correct: true, ms: this.host.elapsed(time) });
+      this.host.tally(true);
       for (const n of held) this.host.keyboard.flash(n, 'correct');
       this.host.keyboard.setTargets([]);
       this.host.staff.setState('correct');
       this.host.complete();
     } else if (check.extra.length > 0) {
       for (const n of check.extra) this.host.keyboard.flash(n, 'wrong');
+      this.countMiss();
       this.wrong(check, time);
     }
   }
 
   noteOff(_note: number, time: number, held: ReadonlySet<number>): void {
     if (held.size > 0 || this.attempt.size === 0) return;
-    const check = checkChord(this.attempt, chordTarget(this.item, this.c.hand));
+    const notes = [...this.attempt];
+    const check = checkChord(notes, chordTarget(this.item, this.c.hand));
     this.attempt.clear();
-    if (!check.complete) this.wrong(check, time);
+    if (!check.complete) {
+      this.countMiss();
+      this.countConfusion(notes);
+      this.wrong(check, time);
+    }
+    this.missed = false;
+  }
+
+  private countMiss(): void {
+    if (this.missed) return;
+    this.missed = true;
+    this.host.tally(false);
+  }
+
+  /** The attempt was a chord, and not this one in another voicing. */
+  private countConfusion(notes: number[]): void {
+    const target = new Set(chordTarget(this.item, this.c.hand).pcs);
+    const played = new Set(notes.map(pitchClass));
+    if (played.size === target.size && [...played].every((p) => target.has(p))) return;
+    const chord = detectChord(notes);
+    if (chord) this.host.confused(chord.symbol);
   }
 
   private wrong(check: ChordCheck, time: number): void {
@@ -185,6 +217,7 @@ export class ChordTask implements Task {
 
   restart(): void {
     this.attempt.clear();
+    this.missed = false;
     this.host.keyboard.setTargets([]);
     this.host.staff.setState('idle');
   }
@@ -200,7 +233,8 @@ export class ChordTask implements Task {
  * A scale by name, played in order (ascending, or up and down — a setting)
  * in any octave. A wrong note is marked and counted, and the scale carries
  * on from the note that was expected. Graded when finished, on wrong notes
- * and total time. Fingering is shown on the keys (unless switched off).
+ * and total time; for the stats every note is a hit or a miss. Fingering is
+ * shown on the keys (unless switched off).
  */
 export class ScaleTask implements Task {
   private item: ScaleItem;
@@ -255,6 +289,7 @@ export class ScaleTask implements Task {
   noteOn(note: number, time: number): void {
     const { keyboard, staff } = this.host;
     const step = this.tracker.press(note, time);
+    this.host.tally(step !== 'wrong');
     if (step === 'wrong') {
       keyboard.flash(note, 'wrong');
       const next = this.tracker.nextKey();

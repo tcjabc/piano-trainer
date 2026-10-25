@@ -16,6 +16,7 @@ import {
   type SongCard,
   type SongCardContent,
 } from '../../core/storage';
+import { chordStatsId, scaleStatsId, sectionStatsId, songStatsId, type ItemRef } from '../../core/stats';
 import { cardKey as noteCardKey } from '../notes/cards';
 import { chordItemId, itemById, scaleItemId, type ChordItem, type LibraryItem, type ScaleItem } from '../library/catalog';
 
@@ -89,4 +90,25 @@ export interface DrillOptions {
   /** Show the chord on the staff as well as its name. */
   chordStaff: boolean;
   fingering: boolean;
+}
+
+/** The stats items a card counts towards: its chord or scale by name, or its song and section (notes have none). */
+export function statsRefs(item: DrillItem): ItemRef[] {
+  if (item.module === 'chords') return [{ id: chordStatsId(item.content.root, item.content.quality), kind: 'chord', songId: null }];
+  if (item.module === 'scales') return [{ id: scaleStatsId(item.content.tonic, item.content.type), kind: 'scale', songId: null }];
+  if (item.module === 'songs') {
+    const { songId, sectionId } = item.content;
+    return [
+      { id: songStatsId(songId), kind: 'song', songId },
+      { id: sectionStatsId(songId, sectionId), kind: 'section', songId },
+    ];
+  }
+  return [];
+}
+
+/** The stats item a Library chord or scale counts towards. */
+export function libraryStatsRef(item: LibraryItem): ItemRef {
+  return item.kind === 'chord'
+    ? { id: chordStatsId(item.spec.root, item.spec.quality), kind: 'chord', songId: null }
+    : { id: scaleStatsId(item.tonic, item.type), kind: 'scale', songId: null };
 }

@@ -2,12 +2,14 @@
  * The drill: shows one card at a time (a note, chord or scale), passes what
  * is played to that card's task, records the first outcome of each showing
  * with the source, and moves on when the card is done. Pause, restart, skip,
- * previous and hear work the same for every kind of card.
+ * previous and hear work the same for every kind of card. Tells the stats
+ * which card is in focus, and counts every attempt (not only the first).
  */
+import { stats } from '../../core/stats-recorder';
 import { cssTimeMs } from '../../ui/dom';
 import type { Keyboard } from '../../ui/keyboard';
 import type { StaffView } from '../../ui/staff';
-import type { DrillItem, DrillOptions } from './items';
+import { statsRefs, type DrillItem, type DrillOptions } from './items';
 import { ReviewSource, type DrillSource, type Outcome } from './sources';
 import { baseTasks, type Task, type TaskFactory, type TaskHost } from './tasks';
 
@@ -67,6 +69,7 @@ export class Drill {
 
   stop(): void {
     window.clearTimeout(this.advanceTimer);
+    stats.focus([]);
     this.phase = 'stopped';
     this.item = null;
     this.task?.leave?.();
@@ -167,7 +170,16 @@ export class Drill {
     },
     complete: () => {
       if (self.item) self.hooks.answered?.(self.item);
+      stats.completed();
       self.advance();
+    },
+    tally: (correct) => {
+      if (!self.item || (self.item.module !== 'chords' && self.item.module !== 'scales')) return;
+      for (const ref of statsRefs(self.item)) stats.result(ref, correct);
+    },
+    confused: (playedSymbol) => {
+      if (self.item?.module !== 'chords') return;
+      stats.confusion(statsRefs(self.item)[0]!.id, playedSymbol);
     },
     stage: (el) => self.hooks.stage?.(el),
   }))(this);
@@ -209,6 +221,7 @@ export class Drill {
       return;
     }
     this.task.show();
+    stats.focus(statsRefs(item));
     if (practice) this.staff.setState('idle', 'Practice — not graded');
     this.staff.setCorner(this.source.corner());
     this.resetTiming();

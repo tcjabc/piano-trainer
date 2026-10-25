@@ -23,7 +23,7 @@ import { FLUSH_MS, stats } from '../core/stats-recorder';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
 import { Drill } from '../modules/drill/drill';
-import { itemContent, libraryItemFor, newSongCard, noteItem, songCardKey, type DrillItem, type DrillOptions } from '../modules/drill/items';
+import { itemContent, libraryItemFor, libraryStatsRef, newSongCard, noteItem, songCardKey, type DrillItem, type DrillOptions } from '../modules/drill/items';
 import { theoryFor } from '../modules/library/theory';
 import { FreeSource, ReviewSource } from '../modules/drill/sources';
 import { baseTasks, HAND_LABELS } from '../modules/drill/tasks';
@@ -146,8 +146,16 @@ export class App {
       settings.hand,
       {
         // The tab is the app's to change; keep it out of the Library view's saves.
-        change: (library) => this.rememberLibrary({ ...library, tab: this.settings.library.tab }),
+        change: (library) => {
+          this.rememberLibrary({ ...library, tab: this.settings.library.tab });
+          if (this.screen === 'library') stats.focus(this.libraryFocus());
+        },
         setHand: (hand) => void this.setHand(hand),
+        played: (item, notes) => {
+          const ref = libraryStatsRef(item);
+          for (let i = 0; i < notes; i++) stats.result(ref, true);
+          stats.completed();
+        },
       },
       this.keyboard,
     );
@@ -507,6 +515,7 @@ export class App {
   private wireInput(): void {
     const noteOn = (note: number, velocity: number, time: number) => {
       audio.noteOn(note, velocity);
+      stats.notePlayed(note);
       this.keyboard.setPressed(note, true);
       this.held.add(note);
       this.visualiser.noteOn(note, velocity);
@@ -602,6 +611,7 @@ export class App {
     if (this.screen === 'library' && screen !== 'library') this.library.deactivate();
     if (this.screen === 'song' && screen !== 'song') this.player.deactivate();
     this.screen = screen;
+    this.startStatsSession(screen);
     if (screen !== 'settings') {
       const fromLibrary = screen === 'library' || screen === 'songs' || screen === 'song' || (screen === 'drill' && this.drillReturn === 'library');
       this.lastArea = screen === 'play' ? 'play' : fromLibrary ? 'library' : 'study';
@@ -676,6 +686,22 @@ export class App {
       ]);
       this.settingsView.focusFirst();
     }
+  }
+
+  /**
+   * Each visit to a screen where something is practised is a stats session:
+   * a drill (voluntary unless it is Today's reviews) and the Library's
+   * play-along. Other screens end the session.
+   */
+  private startStatsSession(screen: Screen): void {
+    if (screen === 'drill') stats.start({ voluntary: this.drillKind === 'free' });
+    else if (screen === 'library') stats.start({ voluntary: true }, this.libraryFocus());
+    else stats.end();
+  }
+
+  private libraryFocus() {
+    const item = this.library.current;
+    return item ? [libraryStatsRef(item)] : [];
   }
 
   private setPlayHotkeys(): void {
