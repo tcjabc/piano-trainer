@@ -2,13 +2,15 @@
  * The only module that touches IndexedDB. Every record carries a UUID `id`
  * and an `updatedAt` timestamp (epoch ms) so a sync layer can be added later.
  */
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
 import type { ChordQuality } from './chords';
 import type { LibraryFilter } from './filter';
+import { signatureFromMusicXml, songKey } from './key-finder';
 import type { Clef } from './pitch';
 import type { ScaleType } from './scales';
-import type { Section, SongData } from './song';
+import type { Section, SongData, SongHand } from './song';
 import type { SectionProgress } from './song-learning';
+import { backfillItemStats, itemStatsIdForSong, measureMissId } from './stats';
 import { withDefaults, type HandChoice, type Settings } from './settings';
 
 /** FSRS card state as stored: dates are epoch ms so records survive JSON round trips. */
@@ -155,6 +157,91 @@ export interface SongProgressRecord extends SectionProgress {
   updatedAt: number;
 }
 
+// ── Practice statistics (running counters; see stats.ts) ─────────────────
+
+export type StatsKind = 'song' | 'chord' | 'scale' | 'section';
+
+/** Counters for one song, section, chord (by name) or scale; id e.g. "chord:C:maj7", "section:<song>:<section>". */
+export interface ItemStatsRecord {
+  id: string;
+  kind: StatsKind;
+  /** The song, for songs and sections (so their stats go with it); null for chords and scales. */
+  songId: string | null;
+  /** Sessions it was played in (one per session). */
+  plays: number;
+  /** Active time in it (idle and hidden time left out). */
+  practiceMs: number;
+  /** The part of practiceMs the player chose (not scheduled reviews). */
+  voluntaryMs: number;
+  /** voluntaryMs decayed with a 30-day half-life, as it stood at affinityAt. */
+  affinity: number;
+  affinityAt: number;
+  hits: number;
+  misses: number;
+  /** Songs and sections: hits and misses by hand. */
+  hands?: Record<SongHand, { hits: number; misses: number }>;
+  lastPlayed: number | null;
+  updatedAt: number;
+}
+
+/** One local day; id is the date, "YYYY-MM-DD". */
+export interface DailyStatsRecord {
+  id: string;
+  practiceMs: number;
+  notesPlayed: number;
+  updatedAt: number;
+}
+
+/** How often a chord was held in Play; id is its symbol, e.g. "Am7". */
+export interface ChordPlayCountRecord {
+  id: string;
+  count: number;
+  updatedAt: number;
+}
+
+/** A chord check that failed: aimed at one chord, played another; id "<targetId>><playedSymbol>". */
+export interface ConfusionRecord {
+  id: string;
+  /** Stats id of the chord aimed at, e.g. "chord:C:maj7". */
+  targetId: string;
+  /** What was held instead, e.g. "C7". */
+  playedSymbol: string;
+  count: number;
+  updatedAt: number;
+}
+
+/** Lifetime key presses, one counter per key from `low` (a single record, id "lifetime"). */
+export interface KeyHitsRecord {
+  id: 'lifetime';
+  low: number;
+  counts: number[];
+  updatedAt: number;
+}
+
+/** Misses in one measure of a song (missed notes and wrong presses); id "<songId>:<measure>". */
+export interface SongMeasureMissRecord {
+  id: string;
+  songId: string;
+  /** Measure index. */
+  measure: number;
+  misses: number;
+  updatedAt: number;
+}
+
+/** A new best clean-pass tempo (one record per improvement, for the progress line). */
+export interface SongTempoBestRecord {
+  id: string;
+  songId: string;
+  /** Null for a pass through the whole song. */
+  sectionId: string | null;
+  /** Tempo factor, 1 = as written. */
+  bestCleanTempo: number;
+  at: number;
+  updatedAt: number;
+}
+
+export const STATS_STORES = ['itemStats', 'dailyStats', 'chordPlayCounts', 'confusions', 'keyHits', 'songMeasureMisses', 'songTempoBests'] as const;
+
 export interface ExportFile {
   app: 'piano-trainer';
   schemaVersion: 1;
@@ -178,6 +265,14 @@ export interface ExportFile {
    * review cards can be matched to this device's copies.
    */
   bundledSongs?: { id: string; bundled: string }[];
+  /** Practice statistics (each missing in exports made before stats existed). */
+  itemStats?: ItemStatsRecord[];
+  dailyStats?: DailyStatsRecord[];
+  chordPlayCounts?: ChordPlayCountRecord[];
+  confusions?: ConfusionRecord[];
+  keyHits?: KeyHitsRecord[];
+  songMeasureMisses?: SongMeasureMissRecord[];
+  songTempoBests?: SongTempoBestRecord[];
 }
 
 export interface ImportSummary {
@@ -188,6 +283,8 @@ export interface ImportSummary {
   decks: number;
   songs: number;
   songProgress: number;
+  /** Records of all the stats stores together. */
+  stats: number;
 }
 
 interface TrainerDB extends DBSchema {
@@ -224,10 +321,68 @@ interface TrainerDB extends DBSchema {
     value: SongProgressRecord;
     indexes: { songId: string };
   };
+  itemStats: {
+    key: string;
+    value: ItemStatsRecord;
+    indexes: { songId: string };
+  };
+  dailyStats: {
+    key: string;
+    value: DailyStatsRecord;
+  };
+  chordPlayCounts: {
+    key: string;
+    value: ChordPlayCountRecord;
+  };
+  confusions: {
+    key: string;
+    value: ConfusionRecord;
+  };
+  keyHits: {
+    key: string;
+    value: KeyHitsRecord;
+  };
+  songMeasureMisses: {
+    key: string;
+    value: SongMeasureMissRecord;
+    indexes: { songId: string };
+  };
+  songTempoBests: {
+    key: string;
+    value: SongTempoBestRecord;
+    indexes: { songId: string };
+  };
 }
 
-/** v1: cards, reviews, settings. v2: free-practice attempts. v3: decks. v4: songs. */
-const DB_VERSION = 4;
+/** v1: cards, reviews, settings. v2: free-practice attempts. v3: decks. v4: songs. v5: practice statistics. */
+const DB_VERSION = 5;
+
+/**
+ * The key of a song stored before keys were detected (no data.keySource):
+ * MusicXML is read again for its signature (an unstated mode used to mean
+ * major); a MIDI file's key came from its signature when it had one.
+ */
+export function withSongKey(song: SongRecord): SongRecord {
+  if (song.data.keySource) return song;
+  const signature = song.musicXml ? signatureFromMusicXml(song.musicXml) : null;
+  if (!signature && song.data.key) return { ...song, data: { ...song.data, keySource: 'signature' } };
+  const key = songKey(song.data.notes, signature);
+  if (key.key === song.data.key && !key.keySource) return song;
+  return { ...song, data: { ...song.data, ...key } };
+}
+
+/** v4 → v5: keys for stored songs, and chord and scale hits and misses from their reviews. */
+async function migrateToV5(tx: IDBPTransaction<TrainerDB, StoreNames<TrainerDB>[], 'versionchange'>, now: number): Promise<void> {
+  const songs = tx.objectStore('songs');
+  for (const song of await songs.getAll()) {
+    const keyed = withSongKey(song);
+    if (keyed !== song) await songs.put(keyed);
+  }
+  const cards = await tx.objectStore('cards').getAll();
+  const reviews = await tx.objectStore('reviews').getAll();
+  const itemStats = tx.objectStore('itemStats');
+  for (const record of backfillItemStats(cards, reviews, now)) await itemStats.put(record);
+}
 
 export function uuid(): string {
   return crypto.randomUUID();
@@ -241,7 +396,7 @@ export class Storage {
   private db(): Promise<IDBPDatabase<TrainerDB>> {
     this.dbPromise ??= openDB<TrainerDB>(this.name, DB_VERSION, {
       // Only adds what an older database is missing; existing data is left alone.
-      upgrade(db, oldVersion) {
+      upgrade(db, oldVersion, _newVersion, transaction) {
         if (oldVersion < 1) {
           const cards = db.createObjectStore('cards', { keyPath: 'id' });
           cards.createIndex('key', 'key', { unique: true });
@@ -262,6 +417,22 @@ export class Storage {
         if (oldVersion < 4) {
           db.createObjectStore('songs', { keyPath: 'id' });
           db.createObjectStore('songProgress', { keyPath: 'id' }).createIndex('songId', 'songId');
+        }
+        if (oldVersion < 5) {
+          db.createObjectStore('itemStats', { keyPath: 'id' }).createIndex('songId', 'songId');
+          db.createObjectStore('dailyStats', { keyPath: 'id' });
+          db.createObjectStore('chordPlayCounts', { keyPath: 'id' });
+          db.createObjectStore('confusions', { keyPath: 'id' });
+          db.createObjectStore('keyHits', { keyPath: 'id' });
+          db.createObjectStore('songMeasureMisses', { keyPath: 'id' }).createIndex('songId', 'songId');
+          db.createObjectStore('songTempoBests', { keyPath: 'id' }).createIndex('songId', 'songId');
+          // Only IndexedDB requests are awaited, so the upgrade transaction stays open until this is done.
+          if (oldVersion > 0) {
+            migrateToV5(transaction, Date.now()).catch((err: unknown) => {
+              console.error('Upgrading the database failed', err);
+              transaction.abort();
+            });
+          }
         }
       },
     });
@@ -375,13 +546,15 @@ export class Storage {
     await (await this.db()).put('songs', song);
   }
 
-  /** Delete a song with its progress and its section cards (their review history stays). */
+  /** Delete a song with its progress, its stats and its section cards (their review history stays). */
   async deleteSong(id: string): Promise<void> {
     const db = await this.db();
-    const tx = db.transaction(['songs', 'songProgress', 'cards'], 'readwrite');
+    const tx = db.transaction(['songs', 'songProgress', 'cards', 'itemStats', 'songMeasureMisses', 'songTempoBests'], 'readwrite');
     await tx.objectStore('songs').delete(id);
-    const progress = await tx.objectStore('songProgress').index('songId').getAllKeys(id);
-    for (const key of progress) await tx.objectStore('songProgress').delete(key);
+    for (const name of ['songProgress', 'itemStats', 'songMeasureMisses', 'songTempoBests'] as const) {
+      const store = tx.objectStore(name);
+      for (const key of await store.index('songId').getAllKeys(id)) await store.delete(key);
+    }
     const cards = (await tx.objectStore('cards').index('module').getAll('songs')) as SongCard[];
     for (const card of cards) if (card.content.songId === id) await tx.objectStore('cards').delete(card.id);
     await tx.done;
@@ -425,20 +598,29 @@ export class Storage {
       songs: songs.filter((s) => s.bundled === null),
       songProgress: await db.getAll('songProgress'),
       bundledSongs: songs.flatMap((s) => (s.bundled === null ? [] : [{ id: s.id, bundled: s.bundled }])),
+      itemStats: await db.getAll('itemStats'),
+      dailyStats: await db.getAll('dailyStats'),
+      chordPlayCounts: await db.getAll('chordPlayCounts'),
+      confusions: await db.getAll('confusions'),
+      keyHits: await db.getAll('keyHits'),
+      songMeasureMisses: await db.getAll('songMeasureMisses'),
+      songTempoBests: await db.getAll('songTempoBests'),
     };
   }
 
   /**
    * Merge an export into the database. Records are matched by `id` (and
    * cards/settings also by their unique `key`); the newer `updatedAt` wins.
-   * Bundled songs aren't imported: their progress and review cards move to
-   * this device's copy of the same song, and are skipped if it was deleted.
+   * Bundled songs aren't imported: their progress, stats and review cards
+   * move to this device's copy of the same song, and are skipped if it was
+   * deleted. Stats counters merge like any other record (the newer wins), so
+   * importing the same file twice never counts anything twice.
    */
   async importAll(data: unknown): Promise<ImportSummary> {
     const file = validateExport(data);
     const db = await this.db();
-    const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts', 'decks', 'songs', 'songProgress'], 'readwrite');
-    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0, decks: 0, songs: 0, songProgress: 0 };
+    const tx = db.transaction(['cards', 'reviews', 'settings', 'attempts', 'decks', 'songs', 'songProgress', ...STATS_STORES], 'readwrite');
+    const summary: ImportSummary = { cards: 0, reviews: 0, settings: 0, attempts: 0, decks: 0, songs: 0, songProgress: 0, stats: 0 };
 
     // The file's bundled-song ids → this device's (older exports carried the bundled songs themselves).
     const songs = tx.objectStore('songs');
@@ -507,7 +689,7 @@ export class Storage {
       if (incoming.bundled !== null) continue;
       const existing = await songs.get(incoming.id);
       if (existing && existing.updatedAt >= incoming.updatedAt) continue;
-      await songs.put(incoming);
+      await songs.put(withSongKey(incoming));
       summary.songs++;
     }
 
@@ -522,6 +704,37 @@ export class Storage {
       summary.songProgress++;
     }
 
+    const merge = async <S extends (typeof STATS_STORES)[number]>(name: S, incoming: TrainerDB[S]['value']) => {
+      const store = tx.objectStore(name);
+      const existing = await store.get(incoming.id);
+      if (existing && existing.updatedAt >= incoming.updatedAt) return;
+      await store.put(incoming);
+      summary.stats++;
+    };
+    for (const raw of file.itemStats ?? []) {
+      if (raw.songId === null) {
+        await merge('itemStats', raw);
+        continue;
+      }
+      const songId = songIdHere(raw.songId);
+      if (songId === null) continue;
+      await merge('itemStats', songId === raw.songId ? raw : { ...raw, id: itemStatsIdForSong(raw, songId), songId });
+    }
+    for (const raw of file.songMeasureMisses ?? []) {
+      const songId = songIdHere(raw.songId);
+      if (songId === null) continue;
+      await merge('songMeasureMisses', songId === raw.songId ? raw : { ...raw, id: measureMissId(songId, raw.measure), songId });
+    }
+    for (const raw of file.songTempoBests ?? []) {
+      const songId = songIdHere(raw.songId);
+      if (songId === null) continue;
+      await merge('songTempoBests', songId === raw.songId ? raw : { ...raw, songId });
+    }
+    for (const incoming of file.dailyStats ?? []) await merge('dailyStats', incoming);
+    for (const incoming of file.chordPlayCounts ?? []) await merge('chordPlayCounts', incoming);
+    for (const incoming of file.confusions ?? []) await merge('confusions', incoming);
+    for (const incoming of file.keyHits ?? []) await merge('keyHits', incoming);
+
     await tx.done;
     return summary;
   }
@@ -535,7 +748,8 @@ function validateExport(data: unknown): ExportFile {
   const hasIds = (rows: unknown) =>
     Array.isArray(rows) &&
     rows.every((r) => typeof r?.id === 'string' && typeof r?.updatedAt === 'number');
-  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || (f.attempts !== undefined && !hasIds(f.attempts)) || (f.decks !== undefined && !hasIds(f.decks)) || (f.songs !== undefined && !hasIds(f.songs)) || (f.songProgress !== undefined && !hasIds(f.songProgress))) {
+  const optional = ['attempts', 'decks', 'songs', 'songProgress', ...STATS_STORES] as const;
+  if (!hasIds(f.cards) || !hasIds(f.reviews) || !hasIds(f.settings) || optional.some((name) => f[name] !== undefined && !hasIds(f[name]))) {
     throw new Error('The export file is incomplete or damaged.');
   }
   if (f.bundledSongs !== undefined && !(Array.isArray(f.bundledSongs) && f.bundledSongs.every((b) => typeof b?.id === 'string' && typeof b?.bundled === 'string'))) {

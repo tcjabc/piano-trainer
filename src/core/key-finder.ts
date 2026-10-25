@@ -96,6 +96,18 @@ export function modeForSignature(notes: readonly { midi: number; duration: numbe
   return fit(hist, pc(tonic + 9), 'minor') > fit(hist, tonic, 'major') ? 'minor' : 'major';
 }
 
+/**
+ * The first key signature in a MusicXML score, read from the text (no DOM),
+ * for songs stored before keys were detected.
+ */
+export function signatureFromMusicXml(xml: string): KeySignature | null {
+  const key = /<key[\s>][\s\S]*?<\/key>/.exec(xml)?.[0];
+  const fifths = key && /<fifths>\s*(-?\d+)\s*<\/fifths>/.exec(key)?.[1];
+  if (!fifths) return null;
+  const mode = /<mode>\s*(\w+)\s*<\/mode>/.exec(key!)?.[1];
+  return { fifths: Number(fifths), mode: mode === 'major' || mode === 'minor' ? mode : null };
+}
+
 /** A song's key and where it came from (key null when it can't be told). */
 export function songKey(
   notes: readonly { midi: number; duration: number }[],

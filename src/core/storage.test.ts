@@ -2,12 +2,13 @@
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { newSongCard } from '../modules/drill/items';
+import { newChordCard, newScaleCard, newSongCard } from '../modules/drill/items';
 import { newCard } from '../modules/notes/cards';
 import { BUNDLED_SONGS, musicXmlRecord } from '../modules/songs/import';
 import { recordReview, Rating } from './scheduler';
 import { DEFAULT_SETTINGS } from './settings';
 import { newProgress } from './song-learning';
+import { newItemStats, sectionStatsId, songStatsId } from './stats';
 import { Storage, type SongRecord } from './storage';
 
 let db: Storage;
@@ -49,7 +50,7 @@ describe('storage', () => {
     const file = JSON.parse(JSON.stringify(await db.exportAll()));
 
     const other = new Storage(`test-${++n}`);
-    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1, attempts: 0, decks: 0, songs: 0, songProgress: 0 });
+    expect(await other.importAll(file)).toEqual({ cards: 1, reviews: 1, settings: 1, attempts: 0, decks: 0, songs: 0, songProgress: 0, stats: 0 });
     expect(await other.getCards('notes')).toEqual([result.card]);
     expect((await other.getSettings()).theme).toBe('light');
     await other.close();
@@ -216,6 +217,144 @@ describe('storage', () => {
     expect(await upgraded.getCards('songs')).toEqual([]);
     expect(await upgraded.getCards('notes')).toEqual([card]);
     await upgraded.close();
+  });
+
+  it('upgrades a version 4 database to add stats: song keys, and chord and scale hits from reviews', async () => {
+    const name = `test-${++n}`;
+    const ode = BUNDLED_SONGS.find((b) => b.id === 'ode-to-joy')!;
+    const minuet = BUNDLED_SONGS.find((b) => b.id === 'minuet-in-g')!;
+    /** A song as version 4 stored it: no keySource, and a key only from a signature (major when no mode). */
+    const asV4 = (song: SongRecord, key: string | null): SongRecord => {
+      const { keySource: _, ...data } = song.data;
+      return { ...song, data: { ...data, key } };
+    };
+    const noKey = asV4(musicXmlRecord(ode.xml.replace(/<key>.*?<\/key>/g, ''), 'ode.musicxml', null, NOW), null);
+    const noMode = asV4(musicXmlRecord(minuet.xml.replace(/<mode>.*?<\/mode>/g, ''), 'minuet.musicxml', null, NOW), 'G major');
+    const midiSong = { ...asV4(musicXmlRecord(ode.xml, 'ode.mid', null, NOW), null), format: 'midi' as const, musicXml: null };
+    const progress = { ...newProgress(), id: `${noKey.id}:s0`, songId: noKey.id, sectionId: 's0', passes: 3, updatedAt: NOW };
+
+    // Two cards for C maj7 (different inversions) count as one chord; note cards aren't backfilled.
+    const cmaj7 = newChordCard({ root: 'C', quality: 'maj7', inversion: 0, hand: 'right' }, NOW);
+    const cmaj7First = newChordCard({ root: 'C', quality: 'maj7', inversion: 1, hand: 'left' }, NOW);
+    const dMajor = newScaleCard({ tonic: 'D', type: 'major', hand: 'right', octaves: 1 }, NOW);
+    const note = newCard({ clef: 'treble', spelling: 'C4', midi: 60 }, NOW);
+    const reviews = [
+      recordReview(cmaj7, Rating.Again, 900, NOW + 1).review,
+      recordReview(cmaj7, Rating.Good, 900, NOW + 2).review,
+      recordReview(cmaj7First, Rating.Again, 900, NOW + 3).review,
+      recordReview(dMajor, Rating.Hard, 900, NOW + 4).review,
+      recordReview(note, Rating.Again, 900, NOW + 5).review,
+    ];
+
+    const v4 = await openDB(name, 4, {
+      upgrade(d) {
+        const cards = d.createObjectStore('cards', { keyPath: 'id' });
+        cards.createIndex('key', 'key', { unique: true });
+        cards.createIndex('module', 'module');
+        const reviews = d.createObjectStore('reviews', { keyPath: 'id' });
+        reviews.createIndex('cardId', 'cardId');
+        reviews.createIndex('reviewedAt', 'reviewedAt');
+        d.createObjectStore('settings', { keyPath: 'id' }).createIndex('key', 'key', { unique: true });
+        d.createObjectStore('attempts', { keyPath: 'id' }).createIndex('at', 'at');
+        d.createObjectStore('decks', { keyPath: 'id' });
+        d.createObjectStore('songs', { keyPath: 'id' });
+        d.createObjectStore('songProgress', { keyPath: 'id' }).createIndex('songId', 'songId');
+      },
+    });
+    for (const card of [cmaj7, cmaj7First, dMajor, note]) await v4.put('cards', card);
+    for (const review of reviews) await v4.put('reviews', review);
+    for (const song of [noKey, noMode, midiSong]) await v4.put('songs', song);
+    await v4.put('songProgress', progress);
+    v4.close();
+
+    const upgraded = new Storage(name);
+    const keys = new Map((await upgraded.getSongs()).map((s) => [s.id, [s.data.key, s.data.keySource]]));
+    expect(keys.get(noKey.id)).toEqual(['C major', 'detected']);
+    expect(keys.get(noMode.id)).toEqual(['G major', 'signature']);
+    expect(keys.get(midiSong.id)).toEqual(['C major', 'detected']);
+    // Everything else is as it was.
+    expect((await upgraded.getSong(noKey.id))?.data.notes).toEqual(noKey.data.notes);
+    expect((await upgraded.getSong(noKey.id))?.updatedAt).toBe(NOW);
+    expect(await upgraded.getSongProgress(noKey.id)).toEqual([progress]);
+    expect(await upgraded.getCards('chords')).toHaveLength(2);
+    expect(await upgraded.getRecentReviews(10)).toHaveLength(5);
+
+    const exported = await upgraded.exportAll();
+    const stats = new Map(exported.itemStats!.map((s) => [s.id, s]));
+    expect([...stats.keys()].sort()).toEqual(['chord:C:maj7', 'scale:D:major']);
+    expect(stats.get('chord:C:maj7')).toMatchObject({ kind: 'chord', songId: null, hits: 1, misses: 2, plays: 0, practiceMs: 0, voluntaryMs: 0, lastPlayed: null });
+    expect(stats.get('scale:D:major')).toMatchObject({ kind: 'scale', hits: 1, misses: 0 });
+    expect(stats.get('chord:C:maj7')?.hands).toBeUndefined();
+    for (const store of ['dailyStats', 'chordPlayCounts', 'confusions', 'keyHits', 'songMeasureMisses', 'songTempoBests'] as const) {
+      expect(exported[store]).toEqual([]);
+    }
+    await upgraded.close();
+  });
+
+  it('round-trips stats, moving a bundled song’s stats to this device’s copy, and deletes them with their song', async () => {
+    const twinkle = BUNDLED_SONGS.find((b) => b.id === 'twinkle-twinkle')!;
+    const theirs = musicXmlRecord(twinkle.xml, 'twinkle-twinkle.musicxml', 'twinkle-twinkle', NOW);
+    const songStats = { ...newItemStats(songStatsId(theirs.id), 'song', theirs.id, NOW), plays: 4, practiceMs: 60_000 };
+    const sectionStats = { ...newItemStats(sectionStatsId(theirs.id, 's0'), 'section', theirs.id, NOW), hits: 30, misses: 2 };
+    const chordStats = { ...newItemStats('chord:C:maj7', 'chord', null, NOW), hits: 8, misses: 3 };
+    const file = {
+      ...(await db.exportAll()),
+      bundledSongs: [{ id: theirs.id, bundled: 'twinkle-twinkle' }],
+      itemStats: [songStats, sectionStats, chordStats],
+      dailyStats: [{ id: '2026-10-24', practiceMs: 90_000, notesPlayed: 412, updatedAt: NOW }],
+      chordPlayCounts: [{ id: 'Am7', count: 12, updatedAt: NOW }],
+      confusions: [{ id: 'chord:C:maj7>C7', targetId: 'chord:C:maj7', playedSymbol: 'C7', count: 9, updatedAt: NOW }],
+      keyHits: [{ id: 'lifetime' as const, low: 21, counts: Array.from({ length: 88 }, (_, i) => i), updatedAt: NOW }],
+      songMeasureMisses: [{ id: `${theirs.id}:3`, songId: theirs.id, measure: 3, misses: 7, updatedAt: NOW }],
+      songTempoBests: [{ id: 't1', songId: theirs.id, sectionId: 's0', bestCleanTempo: 0.8, at: NOW, updatedAt: NOW }],
+    };
+
+    const local = musicXmlRecord(twinkle.xml, 'twinkle-twinkle.musicxml', 'twinkle-twinkle', NOW);
+    await db.putSong(local);
+    expect((await db.importAll(JSON.parse(JSON.stringify(file)))).stats).toBe(9);
+    // Importing the same file again changes nothing (the newer record wins; equal is not newer).
+    expect((await db.importAll(JSON.parse(JSON.stringify(file)))).stats).toBe(0);
+
+    const out = await db.exportAll();
+    expect(out.itemStats!.map((s) => [s.id, s.songId]).sort()).toEqual(
+      [['chord:C:maj7', null], [songStatsId(local.id), local.id], [sectionStatsId(local.id, 's0'), local.id]].sort(),
+    );
+    expect(out.songMeasureMisses).toEqual([{ ...file.songMeasureMisses[0], id: `${local.id}:3`, songId: local.id }]);
+    expect(out.songTempoBests).toEqual([{ ...file.songTempoBests[0], songId: local.id }]);
+    expect(out.dailyStats).toEqual(file.dailyStats);
+    expect(out.chordPlayCounts).toEqual(file.chordPlayCounts);
+    expect(out.confusions).toEqual(file.confusions);
+    expect(out.keyHits).toEqual(file.keyHits);
+
+    // A newer count replaces the older one.
+    const newer = { ...file, dailyStats: [{ ...file.dailyStats[0]!, practiceMs: 120_000, updatedAt: NOW + 1 }] };
+    expect((await db.importAll(newer)).stats).toBe(1);
+    expect((await db.exportAll()).dailyStats![0]!.practiceMs).toBe(120_000);
+
+    await db.deleteSong(local.id);
+    const left = await db.exportAll();
+    expect(left.itemStats!.map((s) => s.id)).toEqual(['chord:C:maj7']);
+    expect(left.songMeasureMisses).toEqual([]);
+    expect(left.songTempoBests).toEqual([]);
+
+    // A device without the bundled song skips its stats.
+    const without = new Storage(`test-${++n}`);
+    expect((await without.importAll(file)).stats).toBe(5);
+    await without.close();
+  });
+
+  it('fills in the key of a song imported from an export made before keys were detected', async () => {
+    const ode = BUNDLED_SONGS.find((b) => b.id === 'ode-to-joy')!;
+    const song = musicXmlRecord(ode.xml, 'ode.musicxml', null, NOW);
+    const { keySource: _, ...data } = song.data;
+    const file = { ...(await db.exportAll()), songs: [{ ...song, data }] };
+    await db.importAll(file);
+    expect((await db.getSong(song.id))?.data).toMatchObject({ key: 'C major', keySource: 'signature' });
+  });
+
+  it('rejects an export with damaged stats', async () => {
+    const file = { ...(await db.exportAll()), dailyStats: [{ practiceMs: 5 }] };
+    await expect(db.importAll(file)).rejects.toThrow(/incomplete or damaged/);
   });
 
   it('rejects files that are not exports', async () => {
