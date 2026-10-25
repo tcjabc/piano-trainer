@@ -10,7 +10,7 @@ import type { Clef } from './pitch';
 import type { ScaleType } from './scales';
 import type { Section, SongData, SongHand } from './song';
 import type { SectionProgress } from './song-learning';
-import { backfillItemStats, itemStatsIdForSong, measureMissId } from './stats';
+import { backfillItemStats, decayAffinity, itemStatsIdForSong, KEY_HITS_COUNT, KEY_HITS_LOW, measureMissId, newItemStats, type StatsDelta } from './stats';
 import { withDefaults, type HandChoice, type Settings } from './settings';
 
 /** FSRS card state as stored: dates are epoch ms so records survive JSON round trips. */
@@ -566,6 +566,99 @@ export class Storage {
 
   async putSongProgress(record: SongProgressRecord): Promise<void> {
     await (await this.db()).put('songProgress', record);
+  }
+
+  // ── Practice statistics ────────────────────────────────────────────────
+
+  /**
+   * Add a batch of counts in one transaction. Affinity is decayed to `now`
+   * before new voluntary time is added. A clean tempo is kept only when it
+   * beats the best so far; counts for a song deleted meanwhile are dropped.
+   */
+  async applyStats(delta: StatsDelta, now: number): Promise<void> {
+    const tx = (await this.db()).transaction(['songs', ...STATS_STORES], 'readwrite');
+    const songs = tx.objectStore('songs');
+    const mentioned = new Set([
+      ...[...delta.items.values()].map((i) => i.ref.songId),
+      ...[...delta.measureMisses.values()].map((m) => m.songId),
+      ...delta.cleanTempos.map((t) => t.songId),
+    ]);
+    const songIds = new Set<string>();
+    for (const id of mentioned) if (id !== null && (await songs.getKey(id))) songIds.add(id);
+    const songExists = (id: string | null) => id === null || songIds.has(id);
+
+    const itemStats = tx.objectStore('itemStats');
+    for (const d of delta.items.values()) {
+      if (!songExists(d.ref.songId)) continue;
+      const r = (await itemStats.get(d.ref.id)) ?? newItemStats(d.ref.id, d.ref.kind, d.ref.songId, now);
+      const next: ItemStatsRecord = {
+        ...r,
+        plays: r.plays + d.plays,
+        practiceMs: r.practiceMs + d.practiceMs,
+        voluntaryMs: r.voluntaryMs + d.voluntaryMs,
+        affinity: decayAffinity(r.affinity, r.affinityAt, now) + d.voluntaryMs,
+        affinityAt: now,
+        hits: r.hits + d.hits,
+        misses: r.misses + d.misses,
+        lastPlayed: d.lastPlayed === null ? r.lastPlayed : Math.max(r.lastPlayed ?? 0, d.lastPlayed),
+        updatedAt: now,
+      };
+      if (r.hands) {
+        next.hands = {
+          L: { hits: r.hands.L.hits + d.hands.L.hits, misses: r.hands.L.misses + d.hands.L.misses },
+          R: { hits: r.hands.R.hits + d.hands.R.hits, misses: r.hands.R.misses + d.hands.R.misses },
+        };
+      }
+      await itemStats.put(next);
+    }
+
+    const daily = tx.objectStore('dailyStats');
+    for (const [id, d] of delta.daily) {
+      const r = await daily.get(id);
+      await daily.put({ id, practiceMs: (r?.practiceMs ?? 0) + d.practiceMs, notesPlayed: (r?.notesPlayed ?? 0) + d.notesPlayed, updatedAt: now });
+    }
+
+    const chordPlays = tx.objectStore('chordPlayCounts');
+    for (const [id, count] of delta.chordPlays) {
+      await chordPlays.put({ id, count: ((await chordPlays.get(id))?.count ?? 0) + count, updatedAt: now });
+    }
+
+    const confusions = tx.objectStore('confusions');
+    for (const [id, c] of delta.confusions) {
+      await confusions.put({ id, targetId: c.targetId, playedSymbol: c.playedSymbol, count: ((await confusions.get(id))?.count ?? 0) + c.count, updatedAt: now });
+    }
+
+    if (delta.keyHits.size) {
+      const keyHits = tx.objectStore('keyHits');
+      const r = (await keyHits.get('lifetime')) ?? { id: 'lifetime' as const, low: KEY_HITS_LOW, counts: new Array<number>(KEY_HITS_COUNT).fill(0), updatedAt: now };
+      const counts = [...r.counts];
+      for (const [midi, n] of delta.keyHits) {
+        const i = midi - r.low;
+        if (i >= 0 && i < counts.length) counts[i] = (counts[i] ?? 0) + n;
+      }
+      await keyHits.put({ ...r, counts, updatedAt: now });
+    }
+
+    const misses = tx.objectStore('songMeasureMisses');
+    for (const [id, m] of delta.measureMisses) {
+      if (!songExists(m.songId)) continue;
+      await misses.put({ id, songId: m.songId, measure: m.measure, misses: ((await misses.get(id))?.misses ?? 0) + m.misses, updatedAt: now });
+    }
+
+    const bests = tx.objectStore('songTempoBests');
+    const bestSoFar = new Map<string, number>();
+    for (const t of [...delta.cleanTempos].sort((a, b) => a.at - b.at)) {
+      if (!songExists(t.songId)) continue;
+      const key = `${t.songId}:${t.sectionId ?? ''}`;
+      if (!bestSoFar.has(key)) {
+        const rows = (await bests.index('songId').getAll(t.songId)).filter((r) => r.sectionId === t.sectionId);
+        bestSoFar.set(key, Math.max(0, ...rows.map((r) => r.bestCleanTempo)));
+      }
+      if (t.tempo <= bestSoFar.get(key)! + 1e-6) continue;
+      bestSoFar.set(key, t.tempo);
+      await bests.put({ id: uuid(), songId: t.songId, sectionId: t.sectionId, bestCleanTempo: t.tempo, at: t.at, updatedAt: now });
+    }
+    await tx.done;
   }
 
   // ── Settings ───────────────────────────────────────────────────────────

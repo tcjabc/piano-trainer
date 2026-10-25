@@ -8,7 +8,7 @@ import { BUNDLED_SONGS, musicXmlRecord } from '../modules/songs/import';
 import { recordReview, Rating } from './scheduler';
 import { DEFAULT_SETTINGS } from './settings';
 import { newProgress } from './song-learning';
-import { newItemStats, sectionStatsId, songStatsId } from './stats';
+import { AFFINITY_HALF_LIFE_MS, dailyDelta, emptyDelta, itemDelta, newItemStats, sectionStatsId, songStatsId } from './stats';
 import { Storage, type SongRecord } from './storage';
 
 let db: Storage;
@@ -341,6 +341,60 @@ describe('storage', () => {
     const without = new Storage(`test-${++n}`);
     expect((await without.importAll(file)).stats).toBe(5);
     await without.close();
+  });
+
+  it('adds batches of counts: decayed affinity, key presses, and only tempos that beat the best', async () => {
+    const twinkle = BUNDLED_SONGS.find((b) => b.id === 'twinkle-twinkle')!;
+    const song = musicXmlRecord(twinkle.xml, 'twinkle.musicxml', null, NOW);
+    await db.putSong(song);
+    const section = { id: sectionStatsId(song.id, 's0'), kind: 'section' as const, songId: song.id };
+    const chord = { id: 'chord:C:maj7', kind: 'chord' as const, songId: null };
+    const batch = (voluntaryMs: number) => {
+      const d = emptyDelta();
+      Object.assign(itemDelta(d, chord), { plays: 1, practiceMs: voluntaryMs, voluntaryMs, hits: 3, misses: 1, lastPlayed: NOW });
+      const s = itemDelta(d, section);
+      s.hits = 5;
+      s.hands.L.hits = 2;
+      s.hands.R.misses = 1;
+      dailyDelta(d, '2026-10-24').practiceMs = voluntaryMs;
+      d.keyHits.set(60, 2).set(20, 9); // A0 is the lowest counted key
+      d.chordPlays.set('Am7', 1);
+      d.measureMisses.set(`${song.id}:2`, { songId: song.id, measure: 2, misses: 4 });
+      return d;
+    };
+
+    await db.applyStats(batch(60_000), NOW);
+    const later = NOW + AFFINITY_HALF_LIFE_MS;
+    const second = batch(10_000);
+    second.cleanTempos.push(
+      { songId: song.id, sectionId: 's0', tempo: 0.7, at: later - 3 },
+      { songId: song.id, sectionId: 's0', tempo: 0.6, at: later - 2 },
+      { songId: song.id, sectionId: 's0', tempo: 0.8, at: later - 1 },
+      { songId: song.id, sectionId: null, tempo: 0.5, at: later },
+    );
+    await db.applyStats(second, later);
+    const third = emptyDelta();
+    third.cleanTempos.push({ songId: song.id, sectionId: 's0', tempo: 0.8, at: later + 1 });
+    await db.applyStats(third, later + 1);
+
+    const out = await db.exportAll();
+    const stats = new Map(out.itemStats!.map((s) => [s.id, s]));
+    expect(stats.get(chord.id)).toMatchObject({ plays: 2, practiceMs: 70_000, voluntaryMs: 70_000, hits: 6, misses: 2, lastPlayed: NOW, affinityAt: later, updatedAt: later });
+    expect(stats.get(chord.id)!.affinity).toBeCloseTo(30_000 + 10_000);
+    expect(stats.get(section.id)).toMatchObject({ hits: 10, hands: { L: { hits: 4, misses: 0 }, R: { hits: 0, misses: 2 } } });
+    expect(out.dailyStats).toEqual([{ id: '2026-10-24', practiceMs: 70_000, notesPlayed: 0, updatedAt: later }]);
+    expect(out.keyHits![0]!.counts[60 - 21]).toBe(4);
+    expect(out.keyHits![0]!.counts.reduce((a, b) => a + b, 0)).toBe(4);
+    expect(out.chordPlayCounts).toEqual([{ id: 'Am7', count: 2, updatedAt: later }]);
+    expect(out.songMeasureMisses![0]!.misses).toBe(8);
+    expect(out.songTempoBests!.map((t) => [t.sectionId, t.bestCleanTempo]).sort()).toEqual([[null, 0.5], ['s0', 0.7], ['s0', 0.8]].sort());
+
+    // Counts for a song deleted before they were saved are dropped.
+    await db.deleteSong(song.id);
+    await db.applyStats(batch(1000), later + 2);
+    const after = await db.exportAll();
+    expect(after.itemStats!.map((s) => s.id)).toEqual([chord.id]);
+    expect(after.songMeasureMisses).toEqual([]);
   });
 
   it('fills in the key of a song imported from an export made before keys were detected', async () => {

@@ -19,6 +19,7 @@ import { spellingToMidi } from '../core/pitch';
 import { noteDrillOptions, type HandChoice, type LibrarySettings, type Settings } from '../core/settings';
 import { storage, uuid, type DeckRecord } from '../core/storage';
 import { MAX_BPM, MIN_BPM } from '../core/metronome';
+import { FLUSH_MS, stats } from '../core/stats-recorder';
 import { clefsFor } from '../modules/notes/cards';
 import { practiseAheadCards, sessionCards, summariseToday, type TodaySummary } from '../modules/notes/deck';
 import { Drill } from '../modules/drill/drill';
@@ -216,6 +217,7 @@ export class App {
       this.player.refreshTokens();
     });
     this.wireInput();
+    this.wireStats();
     this.show('play');
 
     audio.init();
@@ -426,6 +428,20 @@ export class App {
    * hotkeys and knobs); they are saved shortly after they settle. Its beats
    * can pulse the visualiser's horizon. It never touches MIDI input or grading.
    */
+  /** Practice stats are counted in memory and saved now and then, when the tab is hidden and when the page goes. */
+  private wireStats(): void {
+    stats.setHidden(document.hidden);
+    window.setInterval(() => void stats.flush(), FLUSH_MS);
+    document.addEventListener('visibilitychange', () => {
+      stats.setHidden(document.hidden);
+      if (document.hidden) void stats.flush();
+    });
+    window.addEventListener('pagehide', () => {
+      stats.end();
+      void stats.flush();
+    });
+  }
+
   private wireMetronome(): void {
     metronome.on('settings', (m) => {
       this.settings = { ...this.settings, metronome: m };
