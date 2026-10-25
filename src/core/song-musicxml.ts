@@ -7,7 +7,8 @@
  */
 import { strFromU8, unzipSync } from 'fflate';
 import type { Finger } from './fingering';
-import { keyName, sortNotes, type Measure, type SongData, type SongHand, type SongNote, type TempoChange } from './song';
+import { songKey, type KeySignature } from './key-finder';
+import { sortNotes, type Measure, type SongData, type SongHand, type SongNote, type TempoChange } from './song';
 
 export interface ParsedMusicXml {
   title: string;
@@ -85,7 +86,7 @@ export function parseMusicXml(xml: string): ParsedMusicXml {
   const measures: Measure[] = [];
   const tempos: TempoChange[] = [];
   let timeSignature: [number, number] | null = null;
-  let key: string | null = null;
+  let signature: KeySignature | null = null;
 
   parts.forEach((part, partIndex) => {
     const handOf = partHands(part, partIndex, parts.length);
@@ -107,7 +108,10 @@ export function parseMusicXml(xml: string): ParsedMusicXml {
             const time = child(el, 'time');
             if (time && !timeSignature) timeSignature = [num(time, 'beats', 4), num(time, 'beat-type', 4)];
             const k = child(el, 'key');
-            if (k && key === null) key = keyName(num(k, 'fifths'), text(k, 'mode') === 'minor' ? 'minor' : 'major');
+            if (k && signature === null) {
+              const mode = text(k, 'mode');
+              signature = { fifths: num(k, 'fifths'), mode: mode === 'major' || mode === 'minor' ? mode : null };
+            }
             break;
           }
           case 'backup':
@@ -195,7 +199,7 @@ export function parseMusicXml(xml: string): ParsedMusicXml {
   return {
     title,
     composer,
-    data: { notes, measures, tempos: dedupeTempos(tempos), timeSignature: timeSignature ?? [4, 4], key },
+    data: { notes, measures, tempos: dedupeTempos(tempos), timeSignature: timeSignature ?? [4, 4], ...songKey(notes, signature) },
   };
 }
 

@@ -4,7 +4,8 @@
  * note is split at a chosen key, middle C by default.
  */
 import { Midi } from '@tonejs/midi';
-import { measuresFor, keyName, sortNotes, type SongData, type SongHand, type SongNote, type TempoChange } from './song';
+import { songKey, type KeySignature } from './key-finder';
+import { measuresFor, sortNotes, type SongData, type SongHand, type SongNote, type TempoChange } from './song';
 
 export const MIDDLE_C = 60;
 
@@ -20,7 +21,8 @@ export interface ParsedMidi {
   tempos: TempoChange[];
   timeSignature: [number, number];
   timeSignatureChanges: { beat: number; ts: [number, number] }[];
-  key: string | null;
+  /** The file's first key signature, if it has one. */
+  keySignature: KeySignature | null;
 }
 
 export function readMidi(bytes: ArrayBuffer | Uint8Array): ParsedMidi {
@@ -35,14 +37,15 @@ export function readMidi(bytes: ArrayBuffer | Uint8Array): ParsedMidi {
     }));
   const signatures = midi.header.timeSignatures.map((s) => ({ beat: beat(s.ticks), ts: [s.timeSignature[0]!, s.timeSignature[1]!] as [number, number] }));
   const key = midi.header.keySignatures[0];
-  const fifths = key ? keyFifths(key.key, key.scale === 'minor' ? 'minor' : 'major') : null;
+  const mode = key?.scale === 'minor' ? 'minor' : 'major';
+  const fifths = key ? keyFifths(key.key, mode) : null;
   return {
     title: midi.header.name.trim(),
     tracks,
     tempos: midi.header.tempos.map((t) => ({ beat: beat(t.ticks), bpm: t.bpm })),
     timeSignature: signatures[0]?.ts ?? [4, 4],
     timeSignatureChanges: signatures,
-    key: key && fifths !== null ? keyName(fifths, key.scale === 'minor' ? 'minor' : 'major') : null,
+    keySignature: fifths !== null ? { fifths, mode } : null,
   };
 }
 
@@ -78,7 +81,7 @@ export function midiToSong(parsed: ParsedMidi, split = MIDDLE_C): SongData {
     measures: measuresFor(parsed.timeSignature, end, parsed.timeSignatureChanges),
     tempos: parsed.tempos.length ? parsed.tempos : [],
     timeSignature: parsed.timeSignature,
-    key: parsed.key,
+    ...songKey(notes, parsed.keySignature),
   };
 }
 

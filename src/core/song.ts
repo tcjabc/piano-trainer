@@ -4,6 +4,7 @@
  * tempo map turns beats into seconds. UI-agnostic.
  */
 import type { Finger } from './fingering';
+import type { KeySource } from './key-finder';
 
 export type SongHand = 'L' | 'R';
 
@@ -52,6 +53,8 @@ export interface SongData {
   timeSignature: [number, number];
   /** e.g. "G major", or null when unknown. */
   key: string | null;
+  /** From the file's key signature, or detected from the notes (absent when the key is unknown). */
+  keySource?: KeySource;
 }
 
 /** A stretch of whole measures, [start, end) by measure index. */
