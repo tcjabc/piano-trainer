@@ -26,7 +26,7 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | `npm run dev` | Vite dev server with hot reload |
 | `npm run build` | Typecheck, then build the production app into `dist/` (with service worker) |
 | `npm run preview` | Serve the production build locally |
-| `npm test` | Unit tests (Vitest): automatic fingering, song import (MIDI, MusicXML, a MuseScore .mxl), hand splitting, sections, wait-mode matching, timing judgement, learning path, theory notes and templating, metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades) |
+| `npm test` | Unit tests (Vitest): automatic fingering, song import (MIDI, MusicXML, a MuseScore .mxl), hand splitting, sections, wait-mode matching, timing judgement, learning path, theory notes and templating, metronome timing and tap tempo, chord recognition, spelling, scale checking, fingering, search/deck filters, grading, scheduling, storage (including database upgrades), key finding, practice stats (play counting, active time, chord counting, rankings, streaks, charts) |
 | `npm run typecheck` | TypeScript only |
 
 ## Using it
@@ -141,7 +141,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **Ninths:** all five fingers.
 - **F** hides fingering everywhere.
 
-**Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings, and imported songs with their fingering edits, sections and learning progress). Import merges by record, and the newer change wins. Bundled songs aren't exported, since every device adds its own; their progress and review cards are matched to that copy.
+**Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings, stats, and imported songs with their fingering edits, sections and learning progress). Import merges by record, and the newer change wins. Bundled songs aren't exported, since every device adds its own; their progress and review cards are matched to that copy.
 
 ### Songs (Library → Songs, **G**)
 
@@ -212,6 +212,26 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 | V | Falling notes ↔ notation |
 | 1 / 2 / 3 | Left / right / both hands |
 | Esc | Back to the song list |
+
+### Stats (S)
+
+Practice history, worked out when the tab opens. Nothing extra runs while you play: counters are added up in memory and saved every 15 seconds (and when the tab is hidden or closed). Nothing is logged note by note.
+
+- **Days:** current and longest streak (a streak still stands today until the day is over), total practice time, notes played, and a calendar of the last six months shaded by practice time.
+- **Songs, chords, scales:** most played, most practised, and most accurate (only with 5 plays or 200 notes). Chords count by name (any inversion or hand), scales by tonic and type.
+- **Song detail:** pick a song to see its most missed bars, with **Loop** (opens the song looping that bar within its section) and **Own section** (makes the bar a section of its own); clean-tempo progress for the whole song and each section; and accuracy by hand.
+- **Lately:** what you choose to practise, with recent time counting most (a 30-day half-life).
+- **Keys and chords:** preferred key (songs by their key, plus major and minor scales), favourite chord (held in Play), most missed chord, and what was played instead ("Cmaj7 → C7 ×9").
+- **Keys pressed:** every key pressed, anywhere in the app, as heat on a keyboard.
+
+How it's counted:
+
+- **Plays:** one per visit (a drill, a song opened, a visit to Play or the Library) for each thing you played. It counts at the first completed pass, or else when you leave.
+- **Time:** only active time. A gap between key presses counts if it's 30 seconds or less, and none of a longer one; hidden-tab time never counts. Today's reviews are practice time but not chosen time.
+- **Hits and misses:** every chord attempt and every scale note in drills, Study and the Library play-along. In songs, every judged note by hand, with misses per bar; a wrong key counts against its bar but neither hand.
+- **Play:** a chord counts once it's held for 300 ms, and again only after a release.
+- **Clean tempo:** clean passes with both hands in play-along, over a whole section or the whole song. A new record is kept each time it improves.
+- **Songs' keys:** from the key signature, or found from the notes (Krumhansl-Schmuckler) when the file has none or doesn't say major or minor.
 
 ### Metronome
 
@@ -300,7 +320,11 @@ src/
     notation.ts    VexFlow drawing: notes and chords on treble, bass, grand staff
     scheduler.ts   ts-fsrs wrapper, session queue
     grading.ts     grading thresholds for notes, chords and scales (one config)
-    storage.ts     the only IndexedDB module (cards, reviews, settings, attempts, decks, songs, export/import)
+    storage.ts     the only IndexedDB module (cards, reviews, settings, attempts, decks, songs, stats, export/import)
+    key-finder.ts  a song's key: its signature, or Krumhansl-Schmuckler from the notes
+    stats.ts       stats record ids, pending counts, affinity decay, the review-history backfill
+    stats-recorder.ts counting practice while it happens: sessions, active time, batched saves
+    stats-summary.ts what the Stats tab shows, worked out from the counters
     chords.ts      chord qualities, roots, spelling, inversions, formulas, voicings
     scales.ts      scale types, tonics, spelling, played sequences
     fingerings.ts  standard fingerings as data (scales, chords, both hands)
@@ -320,14 +344,15 @@ src/
   modules/drill/ the drill (one card at a time), tasks for notes/chords/scales, chord/scale checking, sources
   modules/library/ catalog and search, Library view, decks, review status, theory templating and compare
   modules/play/  Play area: live staff and chord readout, chord detection, visualiser (and the glow renderer it shares)
-  modules/songs/ Songs tab, import, the player (engine, falling notes, notation) and song review cards
+  modules/songs/ Songs tab, import, the player (engine, falling notes, notation), song review cards and song stats
+  modules/stats/ the Stats tab and its charts (inline SVG)
   ui/            header (with the metronome pill), keyboard, hand legend, staff panel, Today, settings, hotkeys, app shell
   assets/        hand-right.svg (modified Vadivam "hand" icon)
   styles/        tokens.css (all design tokens), base.css, components.css
 build/vadivam.ts Vite plugin that inlines the Vadivam icons listed in src/ui/icon-list.ts
 ```
 
-Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later. Stores: `cards`, `reviews` (FSRS reviews), `settings`, `attempts` (free practice; added in database version 2), `decks` (version 3), and `songs` and `songProgress` (version 4). Each upgrade only creates what an older database is missing.
+Every stored record has a UUID `id` and an `updatedAt` timestamp so sync can be added later. Stores: `cards`, `reviews` (FSRS reviews), `settings`, `attempts` (free practice; added in database version 2), `decks` (version 3), `songs` and `songProgress` (version 4), and the stats counters (version 5): `itemStats`, `dailyStats`, `chordPlayCounts`, `confusions`, `keyHits`, `songMeasureMisses` and `songTempoBests`. Each upgrade only creates what an older database is missing; version 5 also finds the key of stored songs and counts chord and scale hits and misses from their review history.
 
 ## Design
 

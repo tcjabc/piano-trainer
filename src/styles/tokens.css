@@ -67,6 +67,12 @@
   /* Notes that differ when comparing two chords or scales (Library). */
   --color-compare: #5f7d00;
   --color-compare-soft: #e6efc4;
+  /*
+   * Practice heat (Stats: keys pressed, days practised, missed bars): the
+   * one warm hue, mixed with the surface by how much. Only Stats uses it,
+   * so it never meets the finger colours.
+   */
+  --color-heat: #f07a2a;
   /* Hands: left cyan, right magenta (songs, key markers, the hand legend). */
   --color-hand-left: #00a3c4;
   --color-hand-right: #d0309f;

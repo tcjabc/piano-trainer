@@ -17,7 +17,7 @@ import { stats } from '../../core/stats-recorder';
 import type { HandChoice, SongSettings, VisualiserColors } from '../../core/settings';
 import { notesIn, sectionBeats, songEndBeat, measureAt, type Section, type SongNote } from '../../core/song';
 import { applyPass, describeStep, LEARNED, requirement, type SongMode } from '../../core/song-learning';
-import { mergeWithNext, splitSection } from '../../core/song-sections';
+import { isolateMeasure, mergeWithNext, splitSection } from '../../core/song-sections';
 import { setXmlFingering, withXmlFingeringText } from '../../core/song-musicxml';
 import { withoutSuggestedFingering, withSuggestedFingering } from '../../core/autofinger';
 import { h, icon } from '../../ui/dom';
@@ -243,6 +243,27 @@ export class PlayerView {
     this.loopAB = { a: null, b: null };
     this.applyRange();
     this.refocusStats();
+    this.renderAll();
+  }
+
+  /**
+   * Practise one measure (from a trouble bar in Stats): loop it within its
+   * section, or (ownSection) split it into a section of its own and select it.
+   */
+  async practiseMeasure(measure: number, ownSection: boolean): Promise<void> {
+    const entry = this.entry;
+    const m = entry?.song.data.measures[measure];
+    if (!entry || !m || this.review || !this.player) return;
+    if (ownSection) {
+      const { sections, id } = isolateMeasure(this.sections, entry.song.data.measures, measure);
+      if (sections !== this.sections) await this.saveSections(sections, id);
+      else this.selectSection(id);
+      return;
+    }
+    this.selectSection(this.sections.find((s) => measure >= s.start && measure < s.end)?.id ?? null);
+    this.loopAB = { a: m.beat, b: m.beat + m.length };
+    this.player.configure({ loop: true });
+    this.applyRange();
     this.renderAll();
   }
 

@@ -181,6 +181,15 @@ export class Keyboard extends Emitter<KeyboardEvents> {
     if (color) key.style.setProperty('--key-glow', color);
   }
 
+  /** Tint a key by how much it is used, 0–1 (null clears), with a tooltip. Used by the Stats heatmap. */
+  setHeat(note: number, heat: number | null, title = ''): void {
+    const key = this.keys.get(note);
+    if (!key) return;
+    key.classList.toggle('has-heat', heat !== null);
+    key.style.setProperty('--heat', String(heat ?? 0));
+    key.title = title;
+  }
+
   clearLit(): void {
     for (const key of this.track.querySelectorAll('.is-lit')) key.classList.remove('is-lit');
   }

@@ -78,3 +78,9 @@ export function mergeWithNext(sections: Section[], measures: Measure[], id: stri
   const auto = s.name === sectionName(measures, s.start, s.end);
   return [...sections.slice(0, i), { ...s, end: next.end, name: auto ? sectionName(measures, s.start, next.end) : s.name }, ...sections.slice(i + 2)];
 }
+
+/** Make one measure a section of its own (splitting the one it is in); returns the sections and its id. */
+export function isolateMeasure(sections: Section[], measures: Measure[], measure: number): { sections: Section[]; id: string | null } {
+  const split = splitSection(splitSection(sections, measures, measure), measures, measure + 1);
+  return { sections: split, id: split.find((s) => s.start === measure && s.end === measure + 1)?.id ?? null };
+}

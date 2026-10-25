@@ -130,7 +130,7 @@ export class App {
   private songSaveTimer = 0;
   private librarySaveTimer = 0;
   private free: FreePracticeView;
-  private statsView = new StatsView();
+  private statsView = new StatsView({ practiseBar: (songId, measure, own) => void this.practiseBar(songId, measure, own) });
 
   constructor(private root: HTMLElement, settings: Settings) {
     this.settings = settings;
@@ -724,6 +724,12 @@ export class App {
     else if (screen === 'drill') stats.start({ voluntary: this.drillKind === 'free' });
     else if (screen === 'library') stats.start({ voluntary: true }, this.libraryFocus());
     else stats.end();
+  }
+
+  /** From a trouble bar in Stats: open the song at that measure. */
+  private async practiseBar(songId: string, measure: number, ownSection: boolean): Promise<void> {
+    await this.openSong(songId);
+    if (this.screen === 'song') await this.player.practiseMeasure(measure, ownSection);
   }
 
   /** Save what has been counted, then work out the Stats tab from it. */

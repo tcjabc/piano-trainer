@@ -1,27 +1,39 @@
 /**
  * The Stats tab: practice history worked out from the stored counters when
- * the tab opens. Days (streak, time, notes), the rankings for songs, chords
- * and scales, what has been chosen lately, and the keys and chords played.
- * Lists say plainly when there isn't enough yet. Achromatic: no colour here
- * except heat, which comes with the charts.
+ * the tab opens. Days (streak, time, notes, a calendar), the rankings for
+ * songs, chords and scales, what has been chosen lately, the keys and chords
+ * played, a heatmap of keys pressed, and a song's trouble bars, clean-tempo
+ * progress and accuracy by hand. Lists say plainly when there isn't enough
+ * yet. Achromatic, except heat (keys, days, missed bars).
  */
 import {
   ACCURACY_MIN_NOTES,
   ACCURACY_MIN_PLAYS,
   basics,
+  calendar,
   favouriteChords,
+  keyHeat,
   mostMistakenChords,
   preferredKeys,
+  songDetail,
   streaks,
   topAffinity,
   topConfusions,
   type RankedItem,
   type StatsData,
 } from '../../core/stats-summary';
+import { midiToName, PIANO_HIGH, PIANO_LOW } from '../../core/pitch';
 import { localDate } from '../../core/stats';
 import type { StatsKind } from '../../core/storage';
 import { h } from '../../ui/dom';
+import { Keyboard } from '../../ui/keyboard';
 import { formatNoteName } from '../../ui/note-text';
+import { calendarChart, sparkline } from './charts';
+
+export interface StatsActions {
+  /** Practise a song's measure: looped within its section, or as a section of its own. */
+  practiseBar: (songId: string, measure: number, ownSection: boolean) => void;
+}
 
 /** "45 s", "12 min", "3 h 20 min". */
 export function formatPracticeTime(ms: number): string {
@@ -35,6 +47,11 @@ export function formatPracticeTime(ms: number): string {
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
+const empty = (text: string) => h('p.stats-empty.muted', null, text);
+
+/** "Sat 24 Oct". */
+const dayLabel = (date: string) => new Date(`${date}T12:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+
 const KIND_LABELS: Record<StatsKind, string> = { song: 'Song', chord: 'Chord', scale: 'Scale', section: 'Section' };
 
 /** A name that may hold note names (chords, scales, keys) or not (song titles). */
@@ -45,8 +62,12 @@ function nameOf(item: RankedItem): Node | string {
 export class StatsView {
   readonly el: HTMLElement;
   private body: HTMLElement;
+  /** A keyboard of its own for the heatmap (the app's keeps showing what is played). */
+  private keyboard = new Keyboard();
+  /** The song shown in detail. */
+  private songId: string | null = null;
 
-  constructor() {
+  constructor(private actions: StatsActions) {
     this.body = h('div.stats-body', null, h('p.muted', null, 'Loading…'));
     this.el = h('section.panel.stats-panel', { 'aria-labelledby': 'stats-title' }, h('h1.heading', { id: 'stats-title' }, 'Stats'), this.body);
   }
@@ -56,14 +77,132 @@ export class StatsView {
       this.body.replaceChildren(h('p.stats-empty.muted', null, 'Nothing recorded yet. Play, study or open a song, and your practice shows up here.'));
       return;
     }
+    const today = localDate(now);
     this.body.replaceChildren(
-      this.days(data, localDate(now)),
+      this.days(data, today),
+      this.calendar(data, today),
       this.rankings(data, 'song', 'Songs'),
+      this.songDetailSection(data),
       this.rankings(data, 'chord', 'Chords'),
       this.rankings(data, 'scale', 'Scales'),
       this.lately(data, now),
       this.keysAndChords(data),
+      this.keysPressed(data),
     );
+  }
+
+  private calendar(data: StatsData, today: string): HTMLElement {
+    const describe = (d: { date: string; practiceMs: number }) => `${dayLabel(d.date)}: ${d.practiceMs > 0 ? formatPracticeTime(d.practiceMs) : 'no practice'}`;
+    return this.section('Days', h('div.stats-chart', null, calendarChart(calendar(data.dailyStats, today), describe)));
+  }
+
+  /** Every key pressed, anywhere in the app, as heat on a keyboard. */
+  private keysPressed(data: StatsData): HTMLElement {
+    const heat = keyHeat(data.keyHits);
+    if (heat.size === 0) return this.section('Keys pressed', empty('No keys pressed yet.'));
+    const notes = [...heat.keys()];
+    // The 61 keys of a usual keyboard (C2–C7), wider when keys beyond were pressed.
+    this.keyboard.setRange(Math.min(36, ...notes), Math.max(96, ...notes));
+    for (let note = PIANO_LOW; note <= PIANO_HIGH; note++) {
+      const k = heat.get(note);
+      this.keyboard.setHeat(note, k ? k.heat : null, k ? `${midiToName(note)}: ${count(k.count, 'press', 'presses')}` : '');
+    }
+    return this.section('Keys pressed', h('div.stats-keyboard', null, this.keyboard.el));
+  }
+
+  /** One song at a time (most practised first): trouble bars, clean-tempo progress, hands. */
+  private songDetailSection(data: StatsData): HTMLElement {
+    const practised = (id: string) => data.itemStats.find((r) => r.kind === 'song' && r.songId === id)?.practiceMs ?? 0;
+    const songs = data.songs
+      .filter((s) => practised(s.id) > 0 || data.songMeasureMisses.some((m) => m.songId === s.id))
+      .sort((a, b) => practised(b.id) - practised(a.id));
+    if (songs.length === 0) return this.section('Song detail', empty('Play a song to see its trouble bars, tempo and hands.'));
+    if (!songs.some((s) => s.id === this.songId)) this.songId = songs[0]!.id;
+    const detail = h('div.stats-song-detail');
+    const select = h(
+      'select.control.stats-song-select',
+      {
+        'aria-label': 'Song',
+        onchange: () => {
+          this.songId = select.value;
+          detail.replaceChildren(...this.songDetail(data, select.value));
+        },
+      },
+      ...songs.map((s) => h('option', { value: s.id, selected: s.id === this.songId }, s.title)),
+    );
+    detail.replaceChildren(...this.songDetail(data, this.songId!));
+    return this.section('Song detail', select, detail);
+  }
+
+  private songDetail(data: StatsData, songId: string): HTMLElement[] {
+    const detail = songDetail(data, songId);
+    const song = data.songs.find((s) => s.id === songId);
+    if (!detail || !song) return [];
+    const sectionName = (id: string | null) => (id === null ? 'Whole song' : (song.sections.find((s) => s.id === id)?.name ?? ''));
+    const most = Math.max(1, ...detail.trouble.map((t) => t.misses));
+    const trouble = h(
+      'div.stats-ranking',
+      null,
+      h('h3.stats-ranking-title', null, 'Trouble bars'),
+      detail.trouble.length === 0
+        ? empty('No misses yet.')
+        : h(
+            'ol.stats-list',
+            null,
+            ...detail.trouble.map((t) =>
+              h(
+                'li.stats-row.stats-trouble',
+                null,
+                h('span.stats-name', null, `Bar ${t.label}`),
+                h('span.stats-bar', { 'aria-hidden': 'true' }, h('span.stats-bar-fill.is-heat', { style: `inline-size: ${Math.max(4, (100 * t.misses) / most)}%` })),
+                h('span.stats-value.num', null, count(t.misses, 'miss', 'misses')),
+                h(
+                  'span.stats-actions',
+                  null,
+                  h('button.button-outline', { type: 'button', title: `Loop bar ${t.label} within its section`, onclick: () => this.actions.practiseBar(songId, t.measure, false) }, 'Loop'),
+                  h('button.button-outline', { type: 'button', title: `Make bar ${t.label} a section of its own and practise it`, onclick: () => this.actions.practiseBar(songId, t.measure, true) }, 'Own section'),
+                ),
+              ),
+            ),
+          ),
+    );
+    const tempo = h(
+      'div.stats-ranking',
+      null,
+      h('h3.stats-ranking-title', null, 'Clean tempo'),
+      detail.tempo.length === 0
+        ? empty('No clean pass yet (hands together, play-along).')
+        : h(
+            'ol.stats-list',
+            null,
+            ...detail.tempo.map(({ sectionId, points }) =>
+              h(
+                'li.stats-row',
+                null,
+                h('span.stats-name', null, sectionName(sectionId)),
+                sparkline(points.map((p) => p.tempo)),
+                h('span.stats-value.num', null, pct(points[points.length - 1]!.tempo)),
+              ),
+            ),
+          ),
+    );
+    const handRow = (label: string, value: number | null) =>
+      h(
+        'li.stats-row',
+        null,
+        h('span.stats-name', null, label),
+        h('span.stats-bar', { 'aria-hidden': 'true' }, value === null ? null : h('span.stats-bar-fill', { style: `inline-size: ${100 * value}%` })),
+        h('span.stats-value.num', null, value === null ? '–' : pct(value)),
+      );
+    const hands = h(
+      'div.stats-ranking',
+      null,
+      h('h3.stats-ranking-title', null, 'Accuracy by hand'),
+      detail.hands.L === null && detail.hands.R === null
+        ? empty('No notes judged yet.')
+        : h('ol.stats-list', null, handRow('Left hand', detail.hands.L), handRow('Right hand', detail.hands.R)),
+    );
+    return [trouble, h('div.stats-columns', null, tempo, hands)];
   }
 
   private section(title: string, ...children: (HTMLElement | null)[]): HTMLElement {

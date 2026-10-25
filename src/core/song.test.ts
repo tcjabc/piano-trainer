@@ -9,7 +9,7 @@ import twinkleXml from '../data/songs/twinkle-twinkle.musicxml?raw';
 import { beatToSeconds, measureAt, notesIn, secondsToBeat, sectionBeats, stepsOf, type Measure, type SongData } from './song';
 import { midiToSong, needsSplit, readMidi, splitCounts } from './song-midi';
 import { parseMusicXml, setXmlFingering, unzipMxl } from './song-musicxml';
-import { autoSections, mergeWithNext, splitSection } from './song-sections';
+import { autoSections, isolateMeasure, mergeWithNext, splitSection } from './song-sections';
 
 const ode = parseMusicXml(odeXml);
 const minuet = parseMusicXml(minuetXml);
@@ -192,5 +192,16 @@ describe('sections', () => {
     expect(splitSection(merged, m, 2).map((s) => [s.start, s.end, s.name])).toEqual([[0, 2, 'Bars 1–2'], [2, 8, 'Bars 3–8']]);
     expect(sectionBeats(ode.data, { start: 4, end: 8 })).toEqual([16, 32]);
     expect(measureAt(ode.data, 17)).toBe(4);
+  });
+
+  it('makes one bar a section of its own', () => {
+    const m = bars(8);
+    const two = autoSections(m); // bars 1–4, 5–8
+    const middle = isolateMeasure(two, m, 2);
+    expect(middle.sections.map((s) => [s.start, s.end])).toEqual([[0, 2], [2, 3], [3, 4], [4, 8]]);
+    expect(middle.id).toBe('s2');
+    // At the start of a section, only one split is needed; already on its own, nothing changes.
+    expect(isolateMeasure(two, m, 4).sections.map((s) => [s.start, s.end])).toEqual([[0, 4], [4, 5], [5, 8]]);
+    expect(isolateMeasure(middle.sections, m, 2).sections).toBe(middle.sections);
   });
 });
