@@ -705,10 +705,12 @@ export class App {
   /**
    * Each visit to a screen where something is practised is a stats session:
    * Play (its time goes to the day only), a drill (voluntary unless it is
-   * Today's reviews) and the Library's play-along. Other screens end the session.
+   * Today's reviews), a song opened from the list and the Library's
+   * play-along. Other screens end the session.
    */
   private startStatsSession(screen: Screen): void {
     if (screen === 'play') stats.start({ voluntary: true });
+    else if (screen === 'song') stats.start({ voluntary: true }, this.player.statsFocus());
     else if (screen === 'drill') stats.start({ voluntary: this.drillKind === 'free' });
     else if (screen === 'library') stats.start({ voluntary: true }, this.libraryFocus());
     else stats.end();

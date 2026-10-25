@@ -9,8 +9,11 @@
  * hand legend's), so practising a left-hand step never changes Study.
  *
  * Also used, stripped down, for a section's review card in Study.
+ * Every judged note and pass goes to the stats (see song-stats.ts).
  */
 import type { Finger } from '../../core/fingering';
+import type { ItemRef } from '../../core/stats';
+import { stats } from '../../core/stats-recorder';
 import type { HandChoice, SongSettings, VisualiserColors } from '../../core/settings';
 import { notesIn, sectionBeats, songEndBeat, measureAt, type Section, type SongNote } from '../../core/song';
 import { applyPass, describeStep, LEARNED, requirement, type SongMode } from '../../core/song-learning';
@@ -24,6 +27,7 @@ import { formatNoteName } from '../../ui/note-text';
 import { FallingNotes } from './falling-notes';
 import { NotationView } from './notation-view';
 import { MAX_TEMPO, MIN_TEMPO, SongPlayer, type PassReport, type PlayerConfig } from './song-player';
+import { recordMark, recordPass, songStatsRefs } from './song-stats';
 import { progressOf, saveProgress, saveSong, type SongEntry } from './song-store';
 
 export interface PlayerActions {
@@ -177,7 +181,19 @@ export class PlayerView {
     this.player.on('mark', (m) => {
       if (m.kind === 'wrong') this.keyboard.flash(m.midi, 'wrong');
       else if (m.kind !== 'missed') this.keyboard.flash(m.midi, 'correct', 250);
+      recordMark(stats, entry.song.data, entry.song.id, this.statsFocus(), m, this.player?.position ?? 0);
     });
+  }
+
+  /** The stats items being practised: the song, and the section unless it is the whole song. */
+  statsFocus(): ItemRef[] {
+    if (!this.entry) return [];
+    return songStatsRefs(this.entry.song.id, this.review?.sectionId ?? this.section);
+  }
+
+  /** The section changed while practising: its time goes to the new one. */
+  private refocusStats(): void {
+    if (this.active && !this.review) stats.focus(this.statsFocus());
   }
 
   /** Shown on screen: start drawing (and, for a review card, playing). */
@@ -226,6 +242,7 @@ export class PlayerView {
     this.section = id;
     this.loopAB = { a: null, b: null };
     this.applyRange();
+    this.refocusStats();
     this.renderAll();
   }
 
@@ -360,7 +377,9 @@ export class PlayerView {
       : `${pct(r.accuracy)} right · ${r.wrong} wrong note${r.wrong === 1 ? '' : 's'}`;
     let message = `${r.clean ? 'Clean pass' : 'Pass'} at ${pct(r.tempo)}: ${detail}.`;
     // A pass over a whole section counts for that section's progress.
-    const sectionId = this.loopAB.a === null && this.loopAB.b === null ? this.section : null;
+    const loop = this.loopAB.a !== null || this.loopAB.b !== null;
+    recordPass(stats, entry.song.id, this.section, loop, r);
+    const sectionId = loop ? null : this.section;
     if (sectionId) {
       const before = progressOf(entry, sectionId);
       const after = applyPass(before, r);
@@ -441,6 +460,7 @@ export class PlayerView {
     entry.song = await saveSong({ ...entry.song, sections });
     this.section = select;
     this.applyRange();
+    this.refocusStats();
     this.renderAll();
   }
 
