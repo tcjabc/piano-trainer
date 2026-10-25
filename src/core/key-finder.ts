@@ -75,6 +75,11 @@ function fifthsOf(tonic: number, mode: KeyMode): number {
 
 const majorTonic = (fifths: number) => pc(fifths * 7);
 
+/** A key's name from its tonic's pitch class, spelled the usual way, e.g. (3, 'minor') → "Eb minor". */
+export function keyNameOf(tonic: number, mode: KeyMode): string {
+  return keyName(fifthsOf(pc(tonic), mode), mode)!;
+}
+
 /** The best-fitting of the 24 keys, or null when there is nothing to go on. */
 export function findKey(notes: readonly { midi: number; duration: number }[]): FoundKey | null {
   const hist = pitchClassHistogram(notes);
@@ -86,7 +91,7 @@ export function findKey(notes: readonly { midi: number; duration: number }[]): F
       if (!best || score > best.score) best = { tonic, mode, score };
     }
   }
-  return { ...best!, name: keyName(fifthsOf(best!.tonic, best!.mode), best!.mode)! };
+  return { ...best!, name: keyNameOf(best!.tonic, best!.mode) };
 }
 
 /** Major or relative minor for a signature without a mode; major when the notes can't tell. */
