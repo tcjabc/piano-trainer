@@ -33,6 +33,7 @@ import { filterItems, STARTER_DECKS, type ItemKind, type LibraryItem } from '../
 import { DecksPanel } from '../modules/library/decks-view';
 import { LibraryView } from '../modules/library/library-view';
 import { relativeDue, ReviewIndex } from '../modules/library/review-index';
+import { ChordCounter } from '../modules/play/chord-counter';
 import { PlayView } from '../modules/play/play-view';
 import { PlayerView } from '../modules/songs/player-view';
 import { SongTask } from '../modules/songs/song-task';
@@ -101,6 +102,8 @@ export class App {
   );
   private keyboard = new Keyboard();
   private play = new PlayView();
+  /** Chords held in Play, for the stats. */
+  private chordCounter = new ChordCounter();
   private visualiser = new Visualiser(this.keyboard);
   private hands = new HandLegend();
   private zoom = new ZoomControl();
@@ -520,7 +523,10 @@ export class App {
       this.held.add(note);
       this.visualiser.noteOn(note, velocity);
       if (this.visualiserOn) this.keyboard.setLit(note, this.visualiser.colorFor(note));
-      if (this.screen === 'play') this.play.setHeld(this.held);
+      if (this.screen === 'play') {
+        this.play.setHeld(this.held);
+        this.countChord(time);
+      }
       if (this.screen === 'drill') this.drill.noteOn(note, time, this.held);
       if (this.screen === 'free' && this.free.picking) this.free.toggleKey(note);
       if (this.screen === 'library') this.library.notePressed(note, this.held);
@@ -537,7 +543,10 @@ export class App {
       this.held.delete(note);
       this.visualiser.noteOff(note);
       this.keyboard.setLit(note, null);
-      if (this.screen === 'play') this.play.setHeld(this.held);
+      if (this.screen === 'play') {
+        this.play.setHeld(this.held);
+        this.countChord(time);
+      }
       if (this.screen === 'drill') this.drill.noteOff(note, time, this.held);
     };
 
@@ -610,6 +619,10 @@ export class App {
     if (this.screen === 'settings' && screen !== 'settings') this.settingsView.stopLearning(null);
     if (this.screen === 'library' && screen !== 'library') this.library.deactivate();
     if (this.screen === 'song' && screen !== 'song') this.player.deactivate();
+    if (this.screen === 'play' && screen !== 'play') {
+      const chord = this.chordCounter.finish(performance.now());
+      if (chord) stats.chordPlayed(chord);
+    }
     this.screen = screen;
     this.startStatsSession(screen);
     if (screen !== 'settings') {
@@ -625,6 +638,7 @@ export class App {
     if (screen === 'play') {
       this.stage.replaceChildren(this.play.el);
       this.play.setHeld(this.held);
+      this.chordCounter.update(this.held, performance.now());
       this.setPlayHotkeys();
     } else if (screen === 'today') {
       this.stage.replaceChildren(this.studyStage('today', this.today.el));
@@ -690,13 +704,20 @@ export class App {
 
   /**
    * Each visit to a screen where something is practised is a stats session:
-   * a drill (voluntary unless it is Today's reviews) and the Library's
-   * play-along. Other screens end the session.
+   * Play (its time goes to the day only), a drill (voluntary unless it is
+   * Today's reviews) and the Library's play-along. Other screens end the session.
    */
   private startStatsSession(screen: Screen): void {
-    if (screen === 'drill') stats.start({ voluntary: this.drillKind === 'free' });
+    if (screen === 'play') stats.start({ voluntary: true });
+    else if (screen === 'drill') stats.start({ voluntary: this.drillKind === 'free' });
     else if (screen === 'library') stats.start({ voluntary: true }, this.libraryFocus());
     else stats.end();
+  }
+
+  /** The keys held in Play changed: a chord held long enough counts. */
+  private countChord(time: number): void {
+    const chord = this.chordCounter.update(this.held, time);
+    if (chord) stats.chordPlayed(chord);
   }
 
   private libraryFocus() {

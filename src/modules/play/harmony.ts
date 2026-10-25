@@ -58,6 +58,11 @@ export function detectChord(midis: number[]): DetectedChord | null {
   return { symbol, name: chord.name, notes: chord.notes };
 }
 
+/** A chord symbol without its bass note ("C/E" → "C"): the chord by name, as the stats count it. */
+export function chordByName(symbol: string): string {
+  return symbol.split('/')[0]!;
+}
+
 /**
  * Spell held notes for the staff: by the chord's spelling when there is one
  * (so E♭ major shows E♭, not D♯), otherwise with sharps. Low to high.

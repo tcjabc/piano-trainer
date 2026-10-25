@@ -14,7 +14,7 @@ import type { Keyboard } from '../../ui/keyboard';
 import type { StaffView } from '../../ui/staff';
 import type { ChordItem, ScaleItem } from '../library/catalog';
 import { chordTarget, fingers, notation, scaleReference, voicings } from '../library/voicing';
-import { detectChord } from '../play/harmony';
+import { chordByName, detectChord } from '../play/harmony';
 import { checkChord, ScaleTracker, type ChordCheck } from './check';
 import { libraryItemFor, type DrillItem, type DrillOptions } from './items';
 import type { Outcome } from './sources';
@@ -188,7 +188,7 @@ export class ChordTask implements Task {
     const played = new Set(notes.map(pitchClass));
     if (played.size === target.size && [...played].every((p) => target.has(p))) return;
     const chord = detectChord(notes);
-    if (chord) this.host.confused(chord.symbol);
+    if (chord) this.host.confused(chordByName(chord.symbol));
   }
 
   private wrong(check: ChordCheck, time: number): void {
