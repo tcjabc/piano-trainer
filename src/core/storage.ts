@@ -10,6 +10,7 @@ import type { Clef } from './pitch';
 import type { ScaleType } from './scales';
 import type { Section, SongData, SongHand } from './song';
 import type { SectionProgress } from './song-learning';
+import type { StatsData } from './stats-summary';
 import { backfillItemStats, decayAffinity, itemStatsIdForSong, KEY_HITS_COUNT, KEY_HITS_LOW, measureMissId, newItemStats, type StatsDelta } from './stats';
 import { withDefaults, type HandChoice, type Settings } from './settings';
 
@@ -659,6 +660,23 @@ export class Storage {
       await bests.put({ id: uuid(), songId: t.songId, sectionId: t.sectionId, bestCleanTempo: t.tempo, at: t.at, updatedAt: now });
     }
     await tx.done;
+  }
+
+  /** Every stats record and the songs, read together (for the Stats tab). */
+  async getStatsData(): Promise<StatsData> {
+    const tx = (await this.db()).transaction(['songs', ...STATS_STORES]);
+    const [songs, itemStats, dailyStats, chordPlayCounts, confusions, keyHits, songMeasureMisses, songTempoBests] = await Promise.all([
+      tx.objectStore('songs').getAll(),
+      tx.objectStore('itemStats').getAll(),
+      tx.objectStore('dailyStats').getAll(),
+      tx.objectStore('chordPlayCounts').getAll(),
+      tx.objectStore('confusions').getAll(),
+      tx.objectStore('keyHits').get('lifetime'),
+      tx.objectStore('songMeasureMisses').getAll(),
+      tx.objectStore('songTempoBests').getAll(),
+    ]);
+    await tx.done;
+    return { songs, itemStats, dailyStats, chordPlayCounts, confusions, keyHits: keyHits ?? null, songMeasureMisses, songTempoBests };
   }
 
   // ── Settings ───────────────────────────────────────────────────────────

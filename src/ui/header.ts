@@ -1,15 +1,16 @@
-/** Slim app header: name, area tabs (Play / Study / Library), metronome, MIDI status, sample loading, due count, settings. */
+/** Slim app header: name, area tabs (Play / Study / Library / Stats), metronome, MIDI status, sample loading, due count, settings. */
 import type { AudioLoad } from '../core/audio';
 import type { MidiStatus } from '../core/midi';
 import { h, icon } from './dom';
 
 /** Top-level areas. */
-export type Area = 'play' | 'study' | 'library';
+export type Area = 'play' | 'study' | 'library' | 'stats';
 
 const AREAS: { area: Area; label: string; hotkey: string }[] = [
   { area: 'play', label: 'Play', hotkey: 'P' },
   { area: 'study', label: 'Study', hotkey: 'T' },
   { area: 'library', label: 'Library', hotkey: 'L' },
+  { area: 'stats', label: 'Stats', hotkey: 'S' },
 ];
 
 export class Header {
@@ -52,7 +53,7 @@ export class Header {
         h('span.status', { title: 'Cards due today' }, icon('calendar-clock'), this.dueEl, h('span.status-label', null, 'due')),
         h(
           'button.icon-button',
-          { type: 'button', title: 'Settings (S)', 'aria-label': 'Settings', onclick: onSettings },
+          { type: 'button', title: 'Settings (Q)', 'aria-label': 'Settings', onclick: onSettings },
           icon('settings'),
         ),
       )),

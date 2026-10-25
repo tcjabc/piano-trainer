@@ -38,7 +38,7 @@ Open the printed URL (http://localhost:5173/piano-trainer/). Plug in the keyboar
 | V | Visualiser on/off |
 | O | Staff overlay on/off (with the visualiser) |
 | N | Note names on every on-screen key |
-| S | Settings |
+| Q | Settings |
 | - / = / 0 | Zoom the keyboard out / in / fit |
 
 With the visualiser off, the Play card fills the stage and the staff is sized to the card's shape.
@@ -88,9 +88,9 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
 | → | Skip the card (it moves to the end of the session) |
 | H | Hear the answer (note, chord, scale) |
 | Esc | Back to Today (or wherever the drill was started) |
-| S | Settings (from Today) |
+| Q | Settings (from Today) |
 | 1 / 2 / 3 | Practise the left hand / right hand / both |
-| P / T / L | Go to Play / Study / Library (on every screen) |
+| P / T / L / S | Go to Play / Study / Library / Stats (on every screen) |
 | E | Free practice |
 | ← | Previous card, replayed as ungraded practice |
 | F | Fingering on/off everywhere (keys, staff, hand legend) |

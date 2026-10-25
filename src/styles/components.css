@@ -73,8 +73,9 @@
   overflow: auto;
 }
 
-/* Settings can be taller than the stage; align to the top so it scrolls naturally. */
-.app[data-screen='settings'] .stage {
+/* Settings and Stats can be taller than the stage; align to the top so they scroll naturally. */
+.app[data-screen='settings'] .stage,
+.app[data-screen='stats'] .stage {
   place-items: start center;
 }
 
@@ -2302,4 +2303,128 @@ select.control {
 .hand-colour.is-right {
   margin-left: var(--spacing-5);
   background: var(--color-hand-right);
+}
+
+/* ── Stats ──────────────────────────────────────────────────────────────── */
+
+.stats-panel {
+  display: grid;
+  gap: var(--section-gap);
+}
+
+.stats-body {
+  display: grid;
+  gap: var(--section-gap);
+}
+
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--spacing-20);
+}
+
+.stats-tile {
+  display: grid;
+  gap: var(--spacing-2);
+}
+
+.stats-tile-value {
+  font-size: var(--text-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-heading);
+}
+
+.stats-tile-label,
+.stats-note,
+.stats-empty,
+.stats-fact-detail {
+  font-size: var(--text-caption);
+  letter-spacing: var(--tracking-caption);
+}
+
+.stats-section {
+  display: grid;
+  gap: var(--spacing-10);
+  padding-top: var(--spacing-20);
+  border-top: var(--border-divider) solid var(--color-border);
+}
+
+.stats-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-20);
+}
+
+.stats-ranking,
+.stats-fact {
+  display: grid;
+  align-content: start;
+  gap: var(--spacing-5);
+  min-width: 0;
+}
+
+.stats-ranking-title {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-caption);
+}
+
+.stats-list {
+  display: grid;
+  /* Let rows shrink so long names end in an ellipsis instead of widening the column. */
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-10);
+  padding-block: var(--spacing-5);
+  border-bottom: var(--border-hairline) solid var(--color-border);
+}
+
+.stats-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.stats-kind {
+  margin-left: var(--spacing-8);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.stats-value {
+  flex: none;
+  font-size: var(--text-caption);
+}
+
+/* Affinity: a plain bar against the top item (no colour; heat is for the charts). */
+.stats-bar {
+  flex: 0 0 40%;
+  align-self: center;
+  block-size: var(--spacing-8);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-default);
+}
+
+.stats-bar-fill {
+  display: block;
+  block-size: 100%;
+  background: var(--color-text);
+  border-radius: var(--radius-default);
+}
+
+.stats-fact-value {
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-bold);
 }

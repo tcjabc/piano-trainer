@@ -16,6 +16,7 @@ export type ActionId =
   | 'area-play'
   | 'area-study'
   | 'area-library'
+  | 'area-stats'
   | 'start-pause'
   | 'restart'
   | 'next'
@@ -54,6 +55,7 @@ export const ACTIONS: readonly ActionInfo[] = [
   { id: 'area-play', label: 'Play area', hotkey: 'P' },
   { id: 'area-study', label: 'Study area', hotkey: 'T' },
   { id: 'area-library', label: 'Library', hotkey: 'L' },
+  { id: 'area-stats', label: 'Stats', hotkey: 'S' },
   { id: 'start-pause', label: 'Start / pause', hotkey: 'Space' },
   { id: 'restart', label: 'Restart card', hotkey: 'R' },
   { id: 'next', label: 'Skip / next', hotkey: '→' },
@@ -66,7 +68,7 @@ export const ACTIONS: readonly ActionInfo[] = [
   { id: 'hand-both', label: 'Both hands', hotkey: '3' },
   { id: 'zoom-in', label: 'Zoom in', hotkey: '=' },
   { id: 'zoom-out', label: 'Zoom out', hotkey: '-' },
-  { id: 'settings', label: 'Settings', hotkey: 'S' },
+  { id: 'settings', label: 'Settings', hotkey: 'Q' },
   { id: 'back', label: 'Back', hotkey: 'Esc' },
   { id: 'metronome', label: 'Metronome start / stop', hotkey: 'M' },
   { id: 'tap-tempo', label: 'Tap tempo', hotkey: 'B' },

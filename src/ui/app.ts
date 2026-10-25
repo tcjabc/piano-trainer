@@ -39,6 +39,7 @@ import { PlayerView } from '../modules/songs/player-view';
 import { SongTask } from '../modules/songs/song-task';
 import { addBundledSongs, loadSong } from '../modules/songs/song-store';
 import { SongsView } from '../modules/songs/songs-view';
+import { StatsView } from '../modules/stats/stats-view';
 import { Visualiser } from '../modules/play/visualiser';
 import { h, icon } from './dom';
 import { HandLegend } from './hand-legend';
@@ -55,7 +56,7 @@ import { TodayView } from './today';
 import { UpdateToast } from './update-toast';
 import { ZoomControl } from './zoom-control';
 
-type Screen = 'play' | 'today' | 'free' | 'drill' | 'library' | 'songs' | 'song' | 'settings';
+type Screen = 'play' | 'today' | 'free' | 'drill' | 'library' | 'songs' | 'song' | 'stats' | 'settings';
 
 /** Library items that can be added to review and drilled. */
 const REVIEWABLE: ReadonlySet<ItemKind> = new Set(['chord', 'scale']);
@@ -129,6 +130,7 @@ export class App {
   private songSaveTimer = 0;
   private librarySaveTimer = 0;
   private free: FreePracticeView;
+  private statsView = new StatsView();
 
   constructor(private root: HTMLElement, settings: Settings) {
     this.settings = settings;
@@ -576,6 +578,7 @@ export class App {
     if (area === 'library' && this.screen !== 'library' && this.screen !== 'songs' && this.screen !== 'song') this.show(this.libraryScreen);
     const inReviews = this.screen === 'today' || (this.screen === 'drill' && this.drillKind === 'review');
     if (area === 'study' && !inReviews) this.show('today');
+    if (area === 'stats' && this.screen !== 'stats') this.show('stats');
   }
 
   /** The song player's keys: transport, sections, loop, tempo, view and mode. */
@@ -627,7 +630,7 @@ export class App {
     this.startStatsSession(screen);
     if (screen !== 'settings') {
       const fromLibrary = screen === 'library' || screen === 'songs' || screen === 'song' || (screen === 'drill' && this.drillReturn === 'library');
-      this.lastArea = screen === 'play' ? 'play' : fromLibrary ? 'library' : 'study';
+      this.lastArea = screen === 'play' || screen === 'stats' ? screen : fromLibrary ? 'library' : 'study';
     }
     if (screen === 'today' || screen === 'free') this.lastStudy = screen;
     this.root.querySelector('.app')?.setAttribute('data-screen', screen);
@@ -658,9 +661,16 @@ export class App {
       this.hotkeys.set([
         { keys: ['i'], label: 'I', hint: 'Import song', run: () => this.songs.openPicker() },
         { keys: ['c'], label: 'C', hint: 'Chords & scales', optional: true, run: () => this.showLibraryTab('items') },
-        { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
+        { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
         ...this.commonHotkeys(),
       ]);
+    } else if (screen === 'stats') {
+      this.stage.replaceChildren(this.statsView.el);
+      this.hotkeys.set([
+        { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
+        ...this.commonHotkeys(),
+      ]);
+      void this.refreshStats();
     } else if (screen === 'free') {
       this.stage.replaceChildren(this.studyStage('free', this.free.el));
       this.hotkeys.set([
@@ -669,7 +679,7 @@ export class App {
         { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => this.setFreeHand('right') },
         { keys: ['3'], label: '3', hint: '', hidden: true, action: 'hand-both', run: () => this.setFreeHand('both') },
         { keys: ['Escape'], label: 'Esc', hint: 'Today', action: 'back', run: () => this.show('today') },
-        { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
+        { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
         ...this.commonHotkeys(),
       ]);
     } else if (screen === 'drill') {
@@ -693,7 +703,7 @@ export class App {
     } else {
       const back: Screen = this.lastArea === 'study' ? this.lastStudy : this.lastArea === 'library' ? this.libraryScreen : this.lastArea;
       this.stage.replaceChildren(this.settingsView.el);
-      const backLabel = { play: 'Play', today: 'Today', free: 'Free practice', library: 'Library', songs: 'Songs', song: 'Song' } as Record<string, string>;
+      const backLabel = { play: 'Play', today: 'Today', free: 'Free practice', library: 'Library', songs: 'Songs', song: 'Song', stats: 'Stats' } as Record<string, string>;
       this.hotkeys.set([
         { keys: ['Escape'], label: 'Esc', hint: backLabel[back] ?? 'Back', action: 'back', run: () => this.show(back) },
         ...this.commonHotkeys(),
@@ -714,6 +724,13 @@ export class App {
     else if (screen === 'drill') stats.start({ voluntary: this.drillKind === 'free' });
     else if (screen === 'library') stats.start({ voluntary: true }, this.libraryFocus());
     else stats.end();
+  }
+
+  /** Save what has been counted, then work out the Stats tab from it. */
+  private async refreshStats(): Promise<void> {
+    await stats.flush();
+    const data = await storage.getStatsData();
+    if (this.screen === 'stats') this.statsView.update(data, Date.now());
   }
 
   /** The keys held in Play changed: a chord held long enough counts. */
@@ -750,7 +767,7 @@ export class App {
         hidden: !s.visualiser.enabled,
         run: () => void this.patchSettings({ visualiser: { ...this.settings.visualiser, overlay: !this.settings.visualiser.overlay } }),
       },
-      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
+      { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
       ...this.commonHotkeys(),
     ]);
   }
@@ -920,7 +937,7 @@ export class App {
         run: () => this.today.primaryAction(),
       },
       { keys: ['e'], label: 'E', hint: 'Free practice', run: () => this.show('free') },
-      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
+      { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
       ...this.handHotkeys(),
       ...this.commonHotkeys(),
     ]);
@@ -935,7 +952,7 @@ export class App {
     ];
   }
 
-  /** Metronome, zoom, area and fingering keys, on every screen. P and T are shown on the header tabs instead. */
+  /** Metronome, zoom, area and fingering keys, on every screen. The area keys are shown on the header tabs instead. */
   private commonHotkeys(): Hotkey[] {
     const k = METRONOME_KEYS;
     return [
@@ -952,6 +969,7 @@ export class App {
       { keys: ['p'], label: 'P', hint: '', hidden: true, action: 'area-play', run: () => this.showArea('play') },
       { keys: ['t'], label: 'T', hint: '', hidden: true, action: 'area-study', run: () => this.showArea('study') },
       { keys: ['l'], label: 'L', hint: '', hidden: true, action: 'area-library', run: () => this.showArea('library') },
+      { keys: ['s'], label: 'S', hint: '', hidden: true, action: 'area-stats', run: () => this.showArea('stats') },
       { keys: ['e'], label: 'E', hint: '', hidden: true, run: () => this.show('free') },
       {
         keys: ['f'],
@@ -976,7 +994,7 @@ export class App {
       { keys: ['r'], label: 'R', hint: 'Review', run: () => void this.toggleReview(this.library.current) },
       { keys: ['Escape'], label: 'Esc', hint: '', hidden: true, action: 'back', run: () => this.library.clearSearch() },
       ...this.handHotkeys(),
-      { keys: ['s'], label: 'S', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
+      { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
       ...this.commonHotkeys(),
     ]);
   }
