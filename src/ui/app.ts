@@ -4,9 +4,10 @@
  * the keyboard, with the hand legend beside it in Study.
  *
  * Areas: Play (home: free playing, live staff, chord names, visualiser;
- * nothing is recorded), Study (Today's review queue, and free practice
- * whose attempts are logged but never change the schedule) and Library
- * (chords and scales to browse, hear and play along with).
+ * nothing is recorded), Study (Today's review queue, free practice whose
+ * attempts are logged but never change the schedule, and songs with their
+ * player), Library (chords and scales to browse, hear and play along with)
+ * and Stats.
  * Routes MIDI input to sound, the on-screen keyboard, Play and the drill;
  * learned controller buttons and knobs run actions through the same
  * shortcuts as the computer keyboard.
@@ -46,12 +47,11 @@ import { HandLegend } from './hand-legend';
 import { Header, type Area } from './header';
 import { Hotkeys, type Hotkey } from './hotkeys';
 import { Keyboard } from './keyboard';
-import { LibraryNav, type LibraryTab } from './library-nav';
 import { MetronomePill } from './metronome-pill';
 import { SettingsView } from './settings';
 import { StaffView } from './staff';
 import { applyTheme } from './theme';
-import { StudyNav } from './study-nav';
+import { StudyNav, type StudyView } from './study-nav';
 import { TodayView } from './today';
 import { UpdateToast } from './update-toast';
 import { ZoomControl } from './zoom-control';
@@ -91,7 +91,7 @@ export class App {
   private decks: DeckRecord[] = [];
   private decksPanel: DecksPanel;
   /** The Study screen to return to from settings. */
-  private lastStudy: 'today' | 'free' = 'today';
+  private lastStudy: StudyView = 'today';
   /** Keys of the connected keyboard (or the 61-key default). */
   private deviceRange: KeyRange = DEFAULT_KEY_RANGE;
   private knobSaveTimer = 0;
@@ -118,9 +118,10 @@ export class App {
   private drill: Drill;
   private studyNav = new StudyNav((view) => this.show(view));
   private library: LibraryView;
-  private libraryNav = new LibraryNav((tab) => this.showLibraryTab(tab));
   private songs = new SongsView({
     open: (id) => void this.openSong(id),
+    lastPlayed: () => this.settings.songs.lastPlayed,
+    continue: () => void this.continueSong(),
     autoFingering: () => this.settings.songs.autoFingering,
     setAutoFingering: (autoFingering) => this.rememberSongSettings({ ...this.settings.songs, autoFingering }),
   });
@@ -150,9 +151,8 @@ export class App {
       settings.library,
       settings.hand,
       {
-        // The tab is the app's to change; keep it out of the Library view's saves.
         change: (library) => {
-          this.rememberLibrary({ ...library, tab: this.settings.library.tab });
+          this.rememberLibrary(library);
           if (this.screen === 'library') stats.focus(this.libraryFocus());
         },
         setHand: (hand) => void this.setHand(hand),
@@ -178,7 +178,8 @@ export class App {
     });
     this.library.setSidebarExtras(this.decksPanel.el);
     this.player = new PlayerView(this.keyboard, {
-      back: () => this.showLibraryTab('songs'),
+      back: () => this.show('songs'),
+      played: (songId, sectionId) => this.rememberLastPlayed(songId, sectionId),
       // Only the player's own settings; the rest (auto-fingering, daily limits) may have changed elsewhere.
       settingsChanged: ({ view, colors, noteNames, otherHand, mode, tempo, progressiveTempo, countIn }) =>
         this.rememberSongSettings({ ...this.settings.songs, view, colors, noteNames, otherHand, mode, tempo, progressiveTempo, countIn }),
@@ -188,6 +189,7 @@ export class App {
     });
     this.reviewPlayer = new PlayerView(this.keyboard, {
       back: () => undefined,
+      played: () => undefined,
       settingsChanged: () => undefined,
       handShown: () => undefined,
       reviewState: (songId, sectionId) => this.songReviewState(songId, sectionId),
@@ -261,22 +263,26 @@ export class App {
     await this.songs.refresh();
   }
 
-  /** The Library screen for the remembered tab. */
-  private get libraryScreen(): Screen {
-    return this.settings.library.tab === 'songs' ? 'songs' : 'library';
-  }
-
-  private showLibraryTab(tab: LibraryTab): void {
-    if (tab !== this.settings.library.tab) this.rememberLibrary({ ...this.settings.library, tab });
-    this.show(tab === 'songs' ? 'songs' : 'library');
-  }
-
-  private async openSong(id: string): Promise<void> {
+  /** Open a song in the player, at a section (null: the whole song; by default its first section). */
+  private async openSong(id: string, section?: string | null): Promise<void> {
     const entry = await loadSong(id);
     if (!entry) return;
     const s = this.settings;
-    this.player.open(entry, s.songs, s.hand, s.visualiser.colors);
+    this.player.open(entry, s.songs, s.hand, s.visualiser.colors, section);
     this.show('song');
+  }
+
+  /** Back into the song and section last played. */
+  private async continueSong(): Promise<void> {
+    const last = this.settings.songs.lastPlayed;
+    if (last) await this.openSong(last.songId, last.sectionId);
+  }
+
+  /** Something was played in the player: that's where Continue goes. */
+  private rememberLastPlayed(songId: string, sectionId: string | null): void {
+    const last = this.settings.songs.lastPlayed;
+    if (last?.songId === songId && last.sectionId === sectionId) return;
+    this.rememberSongSettings({ ...this.settings.songs, lastPlayed: { songId, sectionId } });
   }
 
   /** A song section in a Study session takes the stage, laid out so its notes fall onto the keys. */
@@ -575,7 +581,7 @@ export class App {
   /** Go to an area's home screen: Play, or Today for Study (a running review session stays). */
   private showArea(area: Area): void {
     if (area === 'play' && this.screen !== 'play') this.show('play');
-    if (area === 'library' && this.screen !== 'library' && this.screen !== 'songs' && this.screen !== 'song') this.show(this.libraryScreen);
+    if (area === 'library' && this.screen !== 'library') this.show('library');
     const inReviews = this.screen === 'today' || (this.screen === 'drill' && this.drillKind === 'review');
     if (area === 'study' && !inReviews) this.show('today');
     if (area === 'stats' && this.screen !== 'stats') this.show('stats');
@@ -596,7 +602,7 @@ export class App {
       { keys: ['.'], label: '.', hint: '', hidden: true, action: 'tempo-up', run: () => p.nudgeTempo(1) },
       { keys: ['w'], label: 'W', hint: 'Wait / play-along', action: 'song-wait', optional: true, run: () => p.toggleWait() },
       { keys: ['v'], label: 'V', hint: 'View', action: 'song-view', optional: true, run: () => p.toggleView() },
-      { keys: ['Escape'], label: 'Esc', hint: 'Songs', action: 'back', run: () => this.showLibraryTab('songs') },
+      { keys: ['Escape'], label: 'Esc', hint: 'Songs', action: 'back', run: () => this.show('songs') },
       // The player's own hands; Study's hand setting is left alone.
       { keys: ['1'], label: '1 2 3', hint: 'Left · right · both', action: 'hand-left', optional: true, run: () => p.setHand('left') },
       { keys: ['2'], label: '2', hint: '', hidden: true, action: 'hand-right', run: () => p.setHand('right') },
@@ -605,14 +611,8 @@ export class App {
     ]);
   }
 
-  /** Library screens show the Chords & scales / Songs switch above their content. */
-  private libraryStage(tab: LibraryTab, content: HTMLElement): HTMLElement {
-    this.libraryNav.set(tab);
-    return h('div.library-area', null, this.libraryNav.el, content);
-  }
-
-  /** Study screens show the Today / Free practice switch above their panel. */
-  private studyStage(view: 'today' | 'free', panel: HTMLElement): HTMLElement {
+  /** Study screens show the Today / Free practice / Songs switch above their panel. */
+  private studyStage(view: StudyView, panel: HTMLElement): HTMLElement {
     this.studyNav.set(view);
     return h('div.study', null, this.studyNav.el, panel);
   }
@@ -629,10 +629,11 @@ export class App {
     this.screen = screen;
     this.startStatsSession(screen);
     if (screen !== 'settings') {
-      const fromLibrary = screen === 'library' || screen === 'songs' || screen === 'song' || (screen === 'drill' && this.drillReturn === 'library');
+      const fromLibrary = screen === 'library' || (screen === 'drill' && this.drillReturn === 'library');
       this.lastArea = screen === 'play' || screen === 'stats' ? screen : fromLibrary ? 'library' : 'study';
     }
-    if (screen === 'today' || screen === 'free') this.lastStudy = screen;
+    if (screen === 'today' || screen === 'free' || screen === 'songs') this.lastStudy = screen;
+    if (screen === 'song') this.lastStudy = 'songs';
     this.root.querySelector('.app')?.setAttribute('data-screen', screen);
     this.header.setArea(screen === 'settings' ? null : this.lastArea);
     this.hands.set(this.legendHand);
@@ -648,7 +649,7 @@ export class App {
       this.setTodayHotkeys();
       void this.refreshSummary();
     } else if (screen === 'library') {
-      this.stage.replaceChildren(this.libraryStage('items', this.library.el));
+      this.stage.replaceChildren(this.library.el);
       this.library.activate();
       this.setLibraryHotkeys();
     } else if (screen === 'song') {
@@ -656,11 +657,12 @@ export class App {
       this.player.activate();
       this.setSongHotkeys();
     } else if (screen === 'songs') {
-      this.stage.replaceChildren(this.libraryStage('songs', this.songs.el));
+      this.stage.replaceChildren(this.studyStage('songs', this.songs.el));
       void this.songs.refresh();
       this.hotkeys.set([
+        { keys: [' ', 'Enter'], label: 'Space', hint: 'Continue', hidden: !this.settings.songs.lastPlayed, action: 'start-pause', run: () => void this.continueSong() },
         { keys: ['i'], label: 'I', hint: 'Import song', run: () => this.songs.openPicker() },
-        { keys: ['c'], label: 'C', hint: 'Chords & scales', optional: true, run: () => this.showLibraryTab('items') },
+        { keys: ['Escape'], label: 'Esc', hint: 'Today', action: 'back', run: () => this.show('today') },
         { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
         ...this.commonHotkeys(),
       ]);
@@ -701,7 +703,7 @@ export class App {
         ...this.commonHotkeys(),
       ]);
     } else {
-      const back: Screen = this.lastArea === 'study' ? this.lastStudy : this.lastArea === 'library' ? this.libraryScreen : this.lastArea;
+      const back: Screen = this.lastArea === 'study' ? this.lastStudy : this.lastArea;
       this.stage.replaceChildren(this.settingsView.el);
       const backLabel = { play: 'Play', today: 'Today', free: 'Free practice', library: 'Library', songs: 'Songs', song: 'Song', stats: 'Stats' } as Record<string, string>;
       this.hotkeys.set([
@@ -943,6 +945,7 @@ export class App {
         run: () => this.today.primaryAction(),
       },
       { keys: ['e'], label: 'E', hint: 'Free practice', run: () => this.show('free') },
+      { keys: ['g'], label: 'G', hint: 'Songs', run: () => this.show('songs') },
       { keys: ['q'], label: 'Q', hint: 'Settings', action: 'settings', optional: true, run: () => this.show('settings') },
       ...this.handHotkeys(),
       ...this.commonHotkeys(),
@@ -977,6 +980,7 @@ export class App {
       { keys: ['l'], label: 'L', hint: '', hidden: true, action: 'area-library', run: () => this.showArea('library') },
       { keys: ['s'], label: 'S', hint: '', hidden: true, action: 'area-stats', run: () => this.showArea('stats') },
       { keys: ['e'], label: 'E', hint: '', hidden: true, run: () => this.show('free') },
+      { keys: ['g'], label: 'G', hint: '', hidden: true, run: () => this.show('songs') },
       {
         keys: ['f'],
         label: 'F',
@@ -991,7 +995,6 @@ export class App {
   private setLibraryHotkeys(): void {
     this.hotkeys.set([
       { keys: ['/'], label: '/', hint: 'Search', run: () => this.library.focusSearch() },
-      { keys: ['g'], label: 'G', hint: 'Songs', optional: true, run: () => this.showLibraryTab('songs') },
       { keys: ['ArrowDown'], label: '↑ ↓', hint: 'Select', action: 'next', run: () => this.library.move(1) },
       { keys: ['ArrowUp'], label: '↑', hint: '', hidden: true, action: 'previous', run: () => this.library.move(-1) },
       { keys: ['h'], label: 'H', hint: 'Hear', action: 'hear', run: () => this.library.hear(false) },

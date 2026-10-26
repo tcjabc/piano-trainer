@@ -11,7 +11,7 @@ import type { PlayerView } from './player-view';
 import { loadSong } from './song-store';
 
 export interface SongTaskDeps {
-  /** The player used for review cards (separate from the Library's). */
+  /** The player used for review cards (separate from the Songs tab's). */
   player: PlayerView;
   settings: () => SongSettings;
   preset: () => VisualiserColors;

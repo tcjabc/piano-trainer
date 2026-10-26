@@ -1123,7 +1123,7 @@ select.control {
   vertical-align: var(--acc-raise-flat);
 }
 
-/* ── Study: Today / Free practice ───────────────────────────────────────── */
+/* ── Study: Today / Free practice / Songs ───────────────────────────────── */
 
 .study {
   display: grid;
@@ -1134,6 +1134,12 @@ select.control {
 
 .study-tabs {
   height: var(--control-height);
+}
+
+/* Songs fill the stage below the tabs, and the list scrolls. */
+.app[data-screen='songs'] .study {
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
 }
 
 /* Free practice can be taller than the stage; align to the top so it scrolls naturally. */
@@ -1763,23 +1769,11 @@ select.control {
   display: none;
 }
 
-/* ── Library tabs and Songs ────────────────────────────────────────────── */
-
-.library-area {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--spacing-10);
-  min-height: 0;
-}
-
-.library-tabs {
-  justify-self: center;
-  height: var(--control-height);
-}
+/* ── Songs ──────────────────────────────────────────────────────────────── */
 
 .songs {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: var(--spacing-10);
   min-height: 0;
   width: 100%;
@@ -1823,7 +1817,28 @@ select.control {
   color: var(--color-wrong);
 }
 
+.song-continue-slot:empty {
+  display: none;
+}
+
+.song-continue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-10) var(--spacing-20);
+  padding: var(--spacing-10);
+  border: var(--border-hairline) solid var(--color-border);
+  border-radius: var(--radius-default);
+}
+
+.song-continue-text {
+  display: grid;
+  gap: var(--spacing-2);
+}
+
 .song-list {
+  /* The last row, whichever of the rows above are empty. */
+  grid-row: -2 / -1;
   min-height: 0;
   overflow: auto;
   border-top: var(--border-hairline) solid var(--color-border);

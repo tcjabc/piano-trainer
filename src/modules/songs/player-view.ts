@@ -32,6 +32,8 @@ import { progressOf, saveProgress, saveSong, type SongEntry } from './song-store
 
 export interface PlayerActions {
   back: () => void;
+  /** Played in (a key pressed, or play started): the song and section (null: the whole song), for Continue. */
+  played: (songId: string, sectionId: string | null) => void;
   /** Settings changed here (view, mode, tempo, …), to be saved. */
   settingsChanged: (settings: SongSettings) => void;
   /** The player's hand changed: show it on the hand legend (nothing is saved). */
@@ -123,11 +125,12 @@ export class PlayerView {
 
   // ── Opening ──────────────────────────────────────────────────────────
 
-  /** Open a song for practice. */
-  open(entry: SongEntry, settings: SongSettings, hand: HandChoice, preset: VisualiserColors): void {
+  /** Open a song for practice, at a section (null: the whole song; by default, or when it's gone, the first section). */
+  open(entry: SongEntry, settings: SongSettings, hand: HandChoice, preset: VisualiserColors, section?: string | null): void {
     this.review = null;
     this.load(entry, settings, this.chosenHand ?? hand, preset);
-    this.section = entry.song.sections[0]?.id ?? null;
+    const sections = entry.song.sections;
+    this.section = section === null || sections.some((s) => s.id === section) ? (section ?? null) : (sections[0]?.id ?? null);
     this.loopAB = { a: null, b: null };
     this.applyRange();
     this.renderAll();
@@ -174,6 +177,7 @@ export class PlayerView {
         this.player?.configure({ mode });
         this.player?.start();
       }
+      if (phase === 'playing' || phase === 'counting-in') this.markPlayed();
       this.renderTransport();
     });
     this.player.on('pass', (r) => void this.onPass(r));
@@ -386,6 +390,12 @@ export class PlayerView {
 
   noteOn(note: number, time: number): void {
     this.player?.noteOn(note, time);
+    this.markPlayed();
+  }
+
+  /** Continue (in the song list) comes back here; review cards don't count. */
+  private markPlayed(): void {
+    if (this.entry && !this.review) this.actions.played(this.entry.song.id, this.section);
   }
 
   // ── Passes ───────────────────────────────────────────────────────────

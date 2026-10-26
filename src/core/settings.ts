@@ -106,6 +106,8 @@ export interface SongSettings {
   autoFingering: boolean;
   /** The bundled public-domain songs have been added (once; they can be deleted). */
   bundledAdded: boolean;
+  /** The song and section (null: the whole song) last played in the player, for Continue. */
+  lastPlayed: { songId: string; sectionId: string | null } | null;
 }
 
 /** The Library's remembered state. */
@@ -117,8 +119,6 @@ export interface LibrarySettings {
   octaves: 1 | 2;
   /** The detail panel's About section is open. */
   aboutOpen: boolean;
-  /** Chords and scales, or songs. */
-  tab: 'items' | 'songs';
 }
 
 export interface Settings {
@@ -180,7 +180,7 @@ export const DEFAULT_SETTINGS: Settings = {
     scales: { ...EMPTY_FILTER, kinds: ['scale'], scaleTypes: ['major'], roots: ['C', 'G', 'F'] },
     octaves: 1,
   },
-  library: { filter: EMPTY_FILTER, selected: null, octaves: 1, aboutOpen: true, tab: 'items' },
+  library: { filter: EMPTY_FILTER, selected: null, octaves: 1, aboutOpen: true },
   chordDrill: { newPerDay: 5, showStaff: false },
   scaleDrill: { newPerDay: 3, direction: 'up' },
   starterDecksAdded: false,
@@ -198,6 +198,7 @@ export const DEFAULT_SETTINGS: Settings = {
     countIn: true,
     autoFingering: true,
     bundledAdded: false,
+    lastPlayed: null,
   },
 };
 
@@ -213,8 +214,9 @@ export function noteDrillOptions(settings: Settings): NoteDrillOptions {
   return { ...settings.noteDrill, clef: CLEF_FOR_HAND[settings.hand] };
 }
 
-type LegacySettings = Omit<Partial<Settings>, 'noteDrill'> & {
+type LegacySettings = Omit<Partial<Settings>, 'noteDrill' | 'library'> & {
   noteDrill?: Partial<NoteDrillSettings> & { clef?: ClefChoice };
+  library?: Partial<LibrarySettings> & { tab?: string };
 };
 
 function visualiserWithDefaults(partial: Partial<VisualiserSettings> | undefined): VisualiserSettings {
@@ -239,6 +241,8 @@ function metronomeWithDefaults(partial: Partial<MetronomeSettings> | undefined):
 /** Fill in any missing fields (e.g. after an app update adds a setting) and migrate old ones. */
 export function withDefaults(partial: LegacySettings | undefined): Settings {
   const { clef: legacyClef, ...noteDrill } = partial?.noteDrill ?? {};
+  // Songs used to be a Library tab; they are in Study now.
+  const { tab: _tab, ...library } = partial?.library ?? {};
   return {
     ...DEFAULT_SETTINGS,
     ...partial,
@@ -248,8 +252,8 @@ export function withDefaults(partial: LegacySettings | undefined): Settings {
     controls: { ...partial?.controls },
     library: {
       ...DEFAULT_SETTINGS.library,
-      ...partial?.library,
-      filter: { ...EMPTY_FILTER, ...partial?.library?.filter },
+      ...library,
+      filter: { ...EMPTY_FILTER, ...library.filter },
     },
     chordDrill: { ...DEFAULT_SETTINGS.chordDrill, ...partial?.chordDrill },
     scaleDrill: { ...DEFAULT_SETTINGS.scaleDrill, ...partial?.scaleDrill },

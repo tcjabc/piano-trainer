@@ -1,11 +1,12 @@
-/** Study's two places: Today (the review queue) and Free practice. Quiet tabs, like the header's. */
+/** Study's three places: Today (the review queue), Free practice and Songs. Quiet tabs, like the header's. */
 import { h } from './dom';
 
-export type StudyView = 'today' | 'free';
+export type StudyView = 'today' | 'free' | 'songs';
 
 const VIEWS: { view: StudyView; label: string; hotkey: string }[] = [
   { view: 'today', label: 'Today', hotkey: 'T' },
   { view: 'free', label: 'Free practice', hotkey: 'E' },
+  { view: 'songs', label: 'Songs', hotkey: 'G' },
 ];
 
 export class StudyNav {

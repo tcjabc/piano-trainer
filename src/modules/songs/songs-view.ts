@@ -1,10 +1,11 @@
 /**
- * The Songs tab of the Library: import (file picker or drag and drop), the
- * list with title, artist, length, key, tempo and progress per section,
- * renaming and deleting. A MIDI file without exactly two tracks is split
- * into hands at a key chosen with a preview.
+ * The Songs tab of Study: Continue (back into the song and section last
+ * played), import (file picker or drag and drop), the list with title,
+ * artist, length, key, tempo and progress per section, renaming and
+ * deleting. A MIDI file without exactly two tracks is split into hands at a
+ * key chosen with a preview.
  */
-import { LEARNED } from '../../core/song-learning';
+import { describeStep, LEARNED } from '../../core/song-learning';
 import { MIDDLE_C, midiToSong, splitCounts, type ParsedMidi } from '../../core/song-midi';
 import { songSeconds, tempoAt, type SongData } from '../../core/song';
 import { storage } from '../../core/storage';
@@ -16,6 +17,9 @@ import { loadSongs, progressOf, saveSong, type SongEntry } from './song-store';
 
 export interface SongsActions {
   open: (songId: string) => void;
+  /** The song and section last played (null: the whole song), and going back into it. */
+  lastPlayed: () => { songId: string; sectionId: string | null } | null;
+  continue: () => void;
   /** Whether imports get suggested fingering, and changing that setting. */
   autoFingering: () => boolean;
   setAutoFingering: (on: boolean) => void;
@@ -35,6 +39,7 @@ export class SongsView {
   private listEl: HTMLElement;
   private messageEl: HTMLElement;
   private importEl: HTMLElement;
+  private continueEl: HTMLElement;
   private entries: SongEntry[] = [];
   /** Song being renamed, or deleted (asking to confirm). */
   private editing: { id: string; kind: 'rename' | 'delete' } | null = null;
@@ -50,6 +55,7 @@ export class SongsView {
     this.listEl = h('div.song-list', { role: 'list' });
     this.messageEl = h('p.songs-message', { role: 'status' });
     this.importEl = h('div.song-import-slot');
+    this.continueEl = h('div.song-continue-slot');
     this.el = h(
       'section.songs',
       { 'aria-label': 'Songs' },
@@ -64,6 +70,7 @@ export class SongsView {
       ),
       this.messageEl,
       this.importEl,
+      this.continueEl,
       this.listEl,
     );
     this.el.addEventListener('dragover', (e) => {
@@ -186,11 +193,41 @@ export class SongsView {
   }
 
   private render(): void {
+    this.renderContinue();
     if (this.entries.length === 0) {
       this.listEl.replaceChildren(h('p.muted.songs-empty', null, 'No songs yet. Import a MIDI or MusicXML file to start.'));
       return;
     }
     this.listEl.replaceChildren(...this.entries.map((e) => this.row(e)));
+  }
+
+  /** Continue: the song last played and its section, if they're still there. */
+  private renderContinue(): void {
+    const last = this.actions.lastPlayed();
+    const entry = last && this.entries.find((e) => e.song.id === last.songId);
+    if (!last || !entry) {
+      this.continueEl.replaceChildren();
+      return;
+    }
+    const section = entry.song.sections.find((s) => s.id === last.sectionId);
+    this.continueEl.replaceChildren(
+      h(
+        'div.song-continue',
+        null,
+        h(
+          'button.button-primary',
+          { type: 'button', title: 'Back into the song and section you last played (Space)', onclick: () => this.actions.continue() },
+          icon('play'),
+          h('span', null, 'Continue'),
+        ),
+        h(
+          'div.song-continue-text',
+          null,
+          h('strong', null, entry.song.title),
+          h('span.muted', null, section ? `${section.name} · ${describeStep(progressOf(entry, section.id))}` : 'Whole song'),
+        ),
+      ),
+    );
   }
 
   private row(entry: SongEntry): HTMLElement {

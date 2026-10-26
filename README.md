@@ -5,8 +5,8 @@ A personal piano-practice PWA driven by a USB MIDI keyboard (built for the Artur
 The app has three areas, switched with the header tabs or **P** / **T** / **L**:
 
 - **Play** (opens on launch): free playing. A live grand staff shows what you're holding (chords stacked), with the note names and, for three or more notes, the chord name (via tonal). Optional visualiser (V). Nothing is scored or recorded.
-- **Study**: notes, chords and scales with spaced repetition (FSRS). A card appears, you play it, and FSRS decides when you see it again. There's also free practice. The header's due count is visible from every area.
-- **Library** (**L**): every chord and scale (browse, search, hear it and play along, see its fingering, add it to review, build decks), and **Songs**: import MIDI or MusicXML and learn them section by section with falling notes or the score.
+- **Study**: notes, chords and scales with spaced repetition (FSRS). A card appears, you play it, and FSRS decides when you see it again. There's also free practice, and **Songs** (**G**): import MIDI or MusicXML and learn them section by section with falling notes or the score. The header's due count is visible from every area.
+- **Library** (**L**): every chord and scale (browse, search, hear it and play along, see its fingering, add it to review, build decks).
 
 ## Setup
 
@@ -64,6 +64,7 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
   - **Nothing changes your schedule:** attempts are logged, marked as free practice, in a separate `attempts` store and included in the export.
   - **Remembered:** your last selection is kept, and 1/2/3 switch its hand.
   - **From the Library:** "Practise now" and a deck's "Practise" use free practice too.
+- **Songs** (the third tab, or **G** from any screen): the song list and player, described under [Songs](#songs-study--songs-g). Song sections you add to review come up in Today with the other cards.
 - **The legend's hand decides which cards come up.** Left hand reads the bass clef and right the treble; chord and scale cards are made for a hand. "Both" means hands together: the chord in each hand, or the scale in parallel octaves.
 - **Notes:** each note (clef + written pitch) is its own card.
   - Wrong = Again; correct in under 1 s = Easy, 1–3 s = Good, over 3 s = Hard.
@@ -92,6 +93,7 @@ It's the only place in the app that uses strong colour. Glow is pre-rendered onc
 | 1 / 2 / 3 | Practise the left hand / right hand / both |
 | P / T / L / S | Go to Play / Study / Library / Stats (on every screen) |
 | E | Free practice |
+| G | Songs (on every screen) |
 | ← | Previous card, replayed as ungraded practice |
 | F | Fingering on/off everywhere (keys, staff, hand legend) |
 | - / = / 0 | Zoom the on-screen keyboard out / in / fit the full range |
@@ -143,7 +145,7 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 
 **Settings**: MIDI device (automatic by default; it skips the KeyLab's DAW/"MIDIIN2" port), hand (same as the legend), range per clef, ledger lines, accidentals, new notes/chords/scales per day, chord staff, scale direction, theme (system/light/dark), fingering, and JSON export/import of all data (cards, reviews, attempts, decks, settings, stats, and imported songs with their fingering edits, sections and learning progress). Import merges by record, and the newer change wins. Bundled songs aren't exported, since every device adds its own; their progress and review cards are matched to that copy.
 
-### Songs (Library → Songs, **G**)
+### Songs (Study → Songs, **G**)
 
 **Import** a song with **Import song** (**I**) or by dropping files on the list:
 - **Formats:** `.mid`/`.midi` (read with @tonejs/midi), and MusicXML as `.musicxml`/`.xml` or compressed `.mxl`.
@@ -152,6 +154,8 @@ The on-screen keys can also be clicked, which helps when no MIDI keyboard is con
 - **MusicXML details:** fingering, ties, chords, tempo marks, rehearsal marks and double bars are read. Repeats are played straight through.
 - **MIDI hands:** when a file has exactly two tracks with notes, the lower track is the left hand. Otherwise you choose a split key (middle C by default) with a preview, a piano roll coloured by hand.
 - **Bundled songs:** three public-domain pieces, arranged here for two hands with fingering on every note: *Twinkle, Twinkle, Little Star*, *Ode to Joy* (Beethoven) and *Minuet in G* (Christian Petzold). Their scores are in `src/data/songs/`.
+
+**Continue** (at the top of the list, or **Space**) opens the song and section you last played, straight back where you were.
 
 **The list** shows title and artist (both renamable), length, key, tempo, and progress per section (one pip per section, filling along the learning path). You can delete a song, which also deletes its progress and review cards.
 

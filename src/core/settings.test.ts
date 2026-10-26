@@ -16,6 +16,13 @@ describe('settings', () => {
     expect(migrated.showFingerNumbers).toBe(true);
   });
 
+  it('drops the old Library tab (songs are in Study now) and keeps the rest of the Library', () => {
+    const migrated = withDefaults({ library: { tab: 'songs', octaves: 2 } });
+    expect(migrated.library).not.toHaveProperty('tab');
+    expect(migrated.library.octaves).toBe(2);
+    expect(migrated.songs.lastPlayed).toBeNull();
+  });
+
   it('prefers a stored hand over a legacy clef', () => {
     expect(withDefaults({ hand: 'both', noteDrill: { clef: 'treble' } }).hand).toBe('both');
   });
