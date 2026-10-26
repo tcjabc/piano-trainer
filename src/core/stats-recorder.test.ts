@@ -125,6 +125,31 @@ describe('active time', () => {
     expect(rec.unsaved.keyHits.get(60)).toBe(3);
   });
 
+  it('pauses while the app plays to you (listen mode), even with keys pressed along', () => {
+    rec.start({ voluntary: true }, [SONG]);
+    press(5);
+    at(8);
+    rec.setListening(true); // the 3 s before listening count
+    press(12);
+    press(20);
+    at(25);
+    rec.setListening(false);
+    press(29); // counted from the end of listening
+    rec.end();
+    expect(item(SONG)?.practiceMs).toBe((5 + 3 + 4) * 1000);
+    expect(rec.unsaved.daily.get(localDate(T0))).toEqual({ practiceMs: 12_000, notesPlayed: 4 });
+  });
+
+  it('does not count a song only listened to as played', () => {
+    rec.start({ voluntary: true }, [SONG]);
+    rec.setListening(true);
+    press(3);
+    rec.setListening(false);
+    at(10);
+    rec.end();
+    expect(item(SONG)).toBeUndefined();
+  });
+
   it('keeps scheduled reviews out of voluntary time', () => {
     rec.start({ voluntary: false }, [SECTION]);
     press(10);

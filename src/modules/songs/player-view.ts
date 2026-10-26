@@ -9,7 +9,8 @@
  * hand legend's), so practising a left-hand step never changes Study.
  *
  * Also used, stripped down, for a section's review card in Study.
- * Every judged note and pass goes to the stats (see song-stats.ts).
+ * Every judged note and pass goes to the stats (see song-stats.ts); while
+ * it plays the song to you (listen mode), the time isn't practice.
  */
 import type { Finger } from '../../core/fingering';
 import type { ItemRef } from '../../core/stats';
@@ -178,6 +179,7 @@ export class PlayerView {
         this.player?.start();
       }
       if (phase === 'playing' || phase === 'counting-in') this.markPlayed();
+      this.syncListening();
       this.renderTransport();
     });
     this.player.on('pass', (r) => void this.onPass(r));
@@ -200,15 +202,22 @@ export class PlayerView {
     if (this.active && !this.review) stats.focus(this.statsFocus());
   }
 
+  /** While the app plays the song to you (listen mode), the time isn't practice. */
+  private syncListening(): void {
+    if (this.active) stats.setListening(this.playing && this.player?.config.mode === 'listen');
+  }
+
   /** Shown on screen: start drawing (and, for a review card, playing). */
   activate(): void {
     this.active = true;
     this.keysShown = '';
     this.loop();
     if (this.review) this.player?.start();
+    this.syncListening();
   }
 
   deactivate(): void {
+    if (this.active) stats.setListening(false);
     this.active = false;
     cancelAnimationFrame(this.raf);
     this.raf = 0;
@@ -347,6 +356,7 @@ export class PlayerView {
     this.previewing = player.config.mode;
     player.configure({ mode: 'listen' });
     player.start();
+    this.syncListening();
     this.renderTransport();
   }
 
@@ -368,6 +378,8 @@ export class PlayerView {
       if (patch.countIn !== undefined) p.countIn = patch.countIn;
       if (patch.progressiveTempo !== undefined) p.progressiveTempo = patch.progressiveTempo;
       this.player.configure(p);
+      // A mode change while playing restarts without a phase change.
+      this.syncListening();
     }
     if (!this.review) this.actions.settingsChanged(this.settings);
     this.renderAll();

@@ -231,7 +231,7 @@ Practice history, worked out when the tab opens. Nothing extra runs while you pl
 How it's counted:
 
 - **Plays:** one per visit (a drill, a song opened, a visit to Play or the Library) for each thing you played. It counts at the first completed pass, or else when you leave.
-- **Time:** only active time. A gap between key presses counts if it's 30 seconds or less, and none of a longer one; hidden-tab time never counts. Today's reviews are practice time but not chosen time.
+- **Time:** only active time, wherever you play: Play, Today's reviews (song sections included), free practice, the Library's play-along and the song player in wait and play-along modes. A gap between key presses counts if it's 30 seconds or less, and none of a longer one; hidden-tab time never counts, and neither does time while the app plays a song to you (listen mode, or hearing a review card first with H), even if you play along. Song time goes to the day (streak, calendar and totals) and to the song and its section. Today's reviews are practice time but not chosen time.
 - **Hits and misses:** every chord attempt and every scale note in drills, Study and the Library play-along. In songs, every judged note by hand, with misses per bar; a wrong key counts against its bar but neither hand.
 - **Play:** a chord counts once it's held for 300 ms, and again only after a release.
 - **Clean tempo:** clean passes with both hands in play-along, over a whole section or the whole song. A new record is kept each time it improves.

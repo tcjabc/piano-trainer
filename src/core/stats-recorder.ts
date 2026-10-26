@@ -11,10 +11,12 @@
  * completed pass (full or loop) or else when the session ends.
  *
  * Time: active time only. A gap between key presses (or from the start of
- * the session, or from the tab being shown again) counts in full when it is
- * at most IDLE_MS, and not at all when it is longer; hidden time never
- * counts, and a session without a key press has no time at all. Voluntary
- * time is active time in sessions the player chose.
+ * the session, from the tab being shown again or from the end of listening)
+ * counts in full when it is at most IDLE_MS, and not at all when it is
+ * longer. Hidden time never counts, nor does time spent listening to the app
+ * play (a song in listen mode, even if keys are pressed along), and a
+ * session without a key press has no time at all. Voluntary time is active
+ * time in sessions the player chose.
  */
 import { bumpCount, dailyDelta, emptyDelta, isEmptyDelta, itemDelta, localDate, mergeDelta, type ItemRef, type StatsDelta } from './stats';
 import type { SongHand } from './song';
@@ -49,11 +51,13 @@ export class StatsRecorder {
   /** Start of the gap being timed (last key press, session start or tab shown). */
   private since = 0;
   private hidden = false;
+  /** The app is playing to you (listen mode), so you aren't practising. */
+  private listening = false;
   private saving: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly sink: StatsSink,
-    private readonly now: () => number = Date.now,
+    private readonly now: () => number = () => Date.now(),
   ) {}
 
   get inSession(): boolean {
@@ -109,6 +113,14 @@ export class StatsRecorder {
     if (hidden === this.hidden) return;
     if (hidden) this.accrue();
     this.hidden = hidden;
+    this.since = this.now();
+  }
+
+  /** The app started or stopped playing to you (a song in listen mode). */
+  setListening(listening: boolean): void {
+    if (listening === this.listening) return;
+    if (listening) this.accrue();
+    this.listening = listening;
     this.since = this.now();
   }
 
@@ -174,7 +186,8 @@ export class StatsRecorder {
 
   private activity(): void {
     const s = this.session;
-    if (!s) return;
+    // Playing along while listening isn't practising the item.
+    if (!s || this.listening) return;
     s.pressed = true;
     this.accrue();
     for (const ref of s.focus) if (!s.played.has(ref.id)) s.played.set(ref.id, { ref, counted: false });
@@ -190,7 +203,7 @@ export class StatsRecorder {
     const now = this.now();
     const gap = now - this.since;
     const s = this.session;
-    if (s?.pressed && !this.hidden && gap > 0 && gap <= IDLE_MS) {
+    if (s?.pressed && !this.hidden && !this.listening && gap > 0 && gap <= IDLE_MS) {
       dailyDelta(this.pending, localDate(now)).practiceMs += gap;
       for (const ref of s.focus) {
         const item = itemDelta(this.pending, ref);
